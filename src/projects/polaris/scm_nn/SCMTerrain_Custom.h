@@ -433,6 +433,8 @@ class CH_VEHICLE_API SCMLoader_Custom : public ChLoadContainer {
         std::size_t operator()(const ChVector2<int>& p) const { return p.x() * 31 + p.y(); }
     };
 
+    // Create visualization mesh
+    void CreateVisualizationMesh(double sizeX, double sizeY);
 
     // Get the initial undeformed terrain height (relative to the SCM plane) at the specified grid node.
     double GetInitHeight(const ChVector2<int>& loc) const;
@@ -475,14 +477,13 @@ class CH_VEHICLE_API SCMLoader_Custom : public ChLoadContainer {
 
     // Update the forces and the geometry, at the beginning of each timestep.
     virtual void Setup() override {
-      // if (m_use_nn){
-      //   ComputeInternalForcesNN();
-      // }
-      // else{
-      //   //TODO DENIZ switch back to Pablo's flag method once we have the working version. Done this way to minimize the code
-      //   ComputeInternalForces();
-      // }
-      ComputeInternalForcesNN();
+      if (m_use_nn){
+        ComputeInternalForcesNN();
+      }
+      else{
+        ComputeInternalForces();
+      }
+      //ComputeInternalForcesNN();
         ChLoadContainer::Update(ChTime, true);
     }
 
@@ -628,6 +629,26 @@ class CH_VEHICLE_API SCMLoader_Custom : public ChLoadContainer {
 
     // Pablo, hardcoded
     std::string m_terrain_dir = "terrain/scm/";
+
+    struct in_box {
+    in_box(const ChVector<>& box_pos, const ChMatrix33<>& box_rot, const ChVector<>& box_size)
+        : pos(box_pos), rot(box_rot), h(box_size / 2) {}
+
+    bool operator()(const ChAparticle* p) {
+        // Convert location in box frame
+        auto w = rot * (p->GetPos() - pos);
+
+        // Check w between all box limits
+        return (w.x() >= -h.x() && w.x() <= +h.x()) &&  //
+               (w.y() >= -h.y() && w.y() <= +h.y()) &&  //
+               (w.z() >= -h.z() && w.z() <= +h.z());
+    }
+
+    ChVector<> pos;
+    ChMatrix33<> rot;
+    ChVector<> h;
+    };
+
 
     
     
