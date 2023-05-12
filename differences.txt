@@ -1,0 +1,373 @@
+diff --git a/src/projects/polaris/scm_nn/SCMTerrain_Custom.cpp b/src/projects/polaris/scm_nn/SCMTerrain_Custom.cpp
+index f1f905284..525753c57 100644
+--- a/src/projects/polaris/scm_nn/SCMTerrain_Custom.cpp
++++ b/src/projects/polaris/scm_nn/SCMTerrain_Custom.cpp
+@@ -54,7 +54,6 @@ SCMTerrain_Custom::SCMTerrain_Custom(ChSystem* system, std::shared_ptr<WheeledVe
+     system->Add(m_loader);    
+ }
+ 
+-
+ // Get the initial terrain height below the specified location.
+ double SCMTerrain_Custom::GetInitHeight(const ChVector<>& loc) const {
+     return m_loader->GetInitHeight(loc);
+@@ -371,36 +370,55 @@ SCMLoader_Custom::SCMLoader_Custom(ChSystem* system, std::shared_ptr<WheeledVehi
+ 
+ }
+ 
++
++// Pablorewrite
+ // Initialize the terrain as a flat grid
+ void SCMLoader_Custom::Initialize(double sizeX, double sizeY, double delta) {
+     m_type = PatchType::FLAT;
+     m_delta=delta;
+ 
+-    // Set default size and offset of sampling box
+-    double tire_radius = m_wheels[0]->GetTire()->GetRadius();
+-    double tire_width = m_wheels[0]->GetTire()->GetWidth();
+-    m_box_size.x() = 1.0;
+-    m_box_size.y() = 1.0;
+-    m_box_size.z() = 2.2;
+-    m_box_offset = ChVector<>(0.0, 0.0, 0.0);
+-
+-
++    // Flag to use NN
+     //m_use_nn = 0;
+     m_use_nn = 1;
++
+     if (m_use_nn){
+-        std::cout << "Using NN" << std::endl;
++        
++        std::string NN_module_name = "wrapped_gnn_onlydef.pt";
++        std::cout << "Using NN " << NN_module_name << std::endl;
++        //std::string NN_module_name = "wrapped_gnn_onlydef_rollout.pt";
++        Load(vehicle::GetDataFile(m_terrain_dir + NN_module_name));
++        // Pablo
++        Create(m_terrain_dir,true);
+     }
+     else{
+         std::cout << "Using standard SCM" << std::endl;
++
++        m_nx = static_cast<int>(std::ceil((sizeX / 2) / delta));  // half number of divisions in X direction
++        m_ny = static_cast<int>(std::ceil((sizeY / 2) / delta));  // number of divisions in Y direction
++
++        m_delta = sizeX / (2 * m_nx);   // grid spacing
++        m_area = std::pow(m_delta, 2);  // area of a cell
++
++        // Return now if no visualization
++        if (!m_trimesh_shape)
++            return;
++
++        CreateVisualizationMesh(sizeX, sizeY);
++        this->AddVisualShape(m_trimesh_shape);
++
++        // Set default size and offset of sampling box
++        double tire_radius = m_wheels[0]->GetTire()->GetRadius();
++        double tire_width = m_wheels[0]->GetTire()->GetWidth();
++        m_box_size.x() = 1.0;
++        m_box_size.y() = 1.0;
++        m_box_size.z() = 2.2;
++        m_box_offset = ChVector<>(0.0, 0.0, 0.0);
+     }
+ 
+-    std::string NN_module_name = "wrapped_gnn_onlydef.pt";
+-    //std::string NN_module_name = "wrapped_gnn_onlydef_rollout.pt";
+-    Load(vehicle::GetDataFile(m_terrain_dir + NN_module_name));
+-    // Pablo
+-    Create(m_terrain_dir,true);
++    
+ }
+ 
++
+ // Initialize the terrain from a specified OBJ mesh file.
+ bool calcBarycentricCoordinates(const ChVector<>& v1,
+                                 const ChVector<>& v2,
+@@ -417,6 +435,104 @@ bool calcBarycentricCoordinates(const ChVector<>& v1,
+     return (0 <= a1) && (a1 <= 1) && (0 <= a2) && (a2 <= 1) && (0 <= a3) && (a3 <= 1);
+ }
+ 
++void SCMLoader_Custom::CreateVisualizationMesh(double sizeX, double sizeY) {
++    int nvx = 2 * m_nx + 1;                     // number of grid vertices in X direction
++    int nvy = 2 * m_ny + 1;                     // number of grid vertices in Y direction
++    int n_verts = nvx * nvy;                    // total number of vertices for initial visualization trimesh
++    int n_faces = 2 * (2 * m_nx) * (2 * m_ny);  // total number of faces for initial visualization trimesh
++    double x_scale = 0.5 / m_nx;                // scale for texture coordinates (U direction)
++    double y_scale = 0.5 / m_ny;                // scale for texture coordinates (V direction)
++
++    // Readability aliases
++    auto trimesh = m_trimesh_shape->GetMesh();
++    trimesh->Clear();
++    std::vector<ChVector<>>& vertices = trimesh->getCoordsVertices();
++    std::vector<ChVector<>>& normals = trimesh->getCoordsNormals();
++    std::vector<ChVector<int>>& idx_vertices = trimesh->getIndicesVertexes();
++    std::vector<ChVector<int>>& idx_normals = trimesh->getIndicesNormals();
++    std::vector<ChVector2<>>& uv_coords = trimesh->getCoordsUV();
++    std::vector<ChColor>& colors = trimesh->getCoordsColors();
++
++    // Resize mesh arrays.
++    vertices.resize(n_verts);
++    normals.resize(n_verts);
++    uv_coords.resize(n_verts);
++    colors.resize(n_verts);
++    idx_vertices.resize(n_faces);
++    idx_normals.resize(n_faces);
++
++    // Load mesh vertices.
++    // We order the vertices starting at the bottom-left corner, row after row.
++    // The bottom-left corner corresponds to the point (-sizeX/2, -sizeY/2).
++    // UV coordinates are mapped in [0,1] x [0,1]. Use smoothed vertex normals.
++    int iv = 0;
++    for (int iy = 0; iy < nvy; iy++) {
++        double y = iy * m_delta - 0.5 * sizeY;
++        for (int ix = 0; ix < nvx; ix++) {
++            double x = ix * m_delta - 0.5 * sizeX;
++            if (m_type == PatchType::FLAT) {
++                // Set vertex location
++                vertices[iv] = m_plane * ChVector<>(x, y, 0);
++                // Initialize vertex normal to Z up
++                normals[iv] = m_plane.TransformDirectionLocalToParent(ChVector<>(0, 0, 1));
++            } else {
++                // Set vertex location
++                vertices[iv] = m_plane * ChVector<>(x, y, m_heights(ix, iy));
++                // Initialize vertex normal to zero (will be set later)
++                normals[iv] = ChVector<>(0, 0, 0);
++            }
++            // Assign color white to all vertices
++            colors[iv] = ChColor(1, 1, 1);
++            // Set UV coordinates in [0,1] x [0,1]
++            uv_coords[iv] = ChVector2<>(ix * x_scale, iy * y_scale);
++            ++iv;
++        }
++    }
++
++    // Specify triangular faces (two at a time).
++    // Specify the face vertices counter-clockwise.
++    // Set the normal indices same as the vertex indices.
++    int it = 0;
++    for (int iy = 0; iy < nvy - 1; iy++) {
++        for (int ix = 0; ix < nvx - 1; ix++) {
++            int v0 = ix + nvx * iy;
++            idx_vertices[it] = ChVector<int>(v0, v0 + 1, v0 + nvx + 1);
++            idx_normals[it] = ChVector<int>(v0, v0 + 1, v0 + nvx + 1);
++            ++it;
++            idx_vertices[it] = ChVector<int>(v0, v0 + nvx + 1, v0 + nvx);
++            idx_normals[it] = ChVector<int>(v0, v0 + nvx + 1, v0 + nvx);
++            ++it;
++        }
++    }
++
++    if (m_type == PatchType::FLAT)
++        return;
++
++    // Initialize the array of accumulators (number of adjacent faces to a vertex)
++    std::vector<int> accumulators(n_verts, 0);
++
++    // Calculate normals and then average the normals from all adjacent faces.
++    for (it = 0; it < n_faces; it++) {
++        // Calculate the triangle normal as a normalized cross product.
++        ChVector<> nrm = Vcross(vertices[idx_vertices[it][1]] - vertices[idx_vertices[it][0]],
++                                vertices[idx_vertices[it][2]] - vertices[idx_vertices[it][0]]);
++        nrm.Normalize();
++        // Increment the normals of all incident vertices by the face normal
++        normals[idx_normals[it][0]] += nrm;
++        normals[idx_normals[it][1]] += nrm;
++        normals[idx_normals[it][2]] += nrm;
++        // Increment the count of all incident vertices by 1
++        accumulators[idx_normals[it][0]] += 1;
++        accumulators[idx_normals[it][1]] += 1;
++        accumulators[idx_normals[it][2]] += 1;
++    }
++
++    // Set the normals to the average values.
++    for (int in = 0; in < n_verts; in++) {
++        normals[in] /= (double)accumulators[in];
++    }
++}
++
+ void SCMLoader_Custom::SetupInitial() {
+     // If no user-specified moving patches, create one that will encompass all collision shapes in the system
+     if (!m_moving_patch) {
+@@ -833,25 +949,6 @@ void SCMLoader_Custom::ComputeInternalForcesNN() {
+         int patch_id;                // index of associated patch id
+     };
+ 
+-    struct in_box {
+-    in_box(const ChVector<>& box_pos, const ChMatrix33<>& box_rot, const ChVector<>& box_size)
+-        : pos(box_pos), rot(box_rot), h(box_size / 2) {}
+-
+-    bool operator()(const ChAparticle* p) {
+-        // Convert location in box frame
+-        auto w = rot * (p->GetPos() - pos);
+-
+-        // Check w between all box limits
+-        return (w.x() >= -h.x() && w.x() <= +h.x()) &&  //
+-               (w.y() >= -h.y() && w.y() <= +h.y()) &&  //
+-               (w.z() >= -h.z() && w.z() <= +h.z());
+-    }
+-
+-    ChVector<> pos;
+-    ChMatrix33<> rot;
+-    ChVector<> h;
+-    };
+-
+     //if (m_use_nn){
+ 
+     // Prepare NN model inputs
+@@ -967,6 +1064,8 @@ void SCMLoader_Custom::ComputeInternalForcesNN() {
+         std::cerr << "Execute error other: " << e.what() << std::endl;
+         return;
+     }
++
++    cout << "Numparts: " << m_num_particles[0] + m_num_particles[1] + m_num_particles[2] + m_num_particles[3] << endl;
+    
+     // Loop over all vehicle wheels
+     for (int i = 0; i < 4; i++) {
+@@ -991,7 +1090,6 @@ void SCMLoader_Custom::ComputeInternalForcesNN() {
+     //    std::cout<<"p_new= "<<p_new<<std::endl;
+ 
+ 
+-        // Debug Pablo
+        m_wheel_particles[i][j]->SetPos(p_new); 
+ 
+ 
+@@ -1209,6 +1307,10 @@ void SCMLoader_Custom::ComputeInternalForcesNN() {
+     int numnewhits = (int)newhits.size();
+     std::cout << "Num newhits: " << numnewhits << std::endl;
+ 
++    // Pablodebug
++    ChVector<> meanforce;
++    int forcecounts = 0;
++
+     // Process only hit nodes
+     //for (auto& h : hits) {
+     for (auto& h : newhits) {
+@@ -1312,6 +1414,11 @@ void SCMLoader_Custom::ComputeInternalForcesNN() {
+             Ft = T * m_area * nr.tau;
+         }
+ 
++        // Pablodebug
++        ChVector<> forcetest = Fn + Ft;
++        meanforce += forcetest;
++        forcecounts++;
++
+         if (ChBody* rigidbody = dynamic_cast<ChBody*>(contactable)) {
+             // [](){} Trick: no deletion for this shared ptr, since 'rigidbody' was not a new ChBody()
+             // object, but an already used pointer because mrayhit_result.hitModel->GetPhysicsItem()
+@@ -1356,6 +1463,9 @@ void SCMLoader_Custom::ComputeInternalForcesNN() {
+ 
+     }  // end loop on ray hits
+ 
++    // Pablodebug
++    cout << "Mean force: " << meanforce/(float)forcecounts << endl;
++
+ 
+     m_timer_contact_forces.stop();
+ 
+@@ -1827,6 +1937,10 @@ void SCMLoader_Custom::ComputeInternalForces() {
+     double elastic_K = m_elastic_K;
+     double damping_R = m_damping_R;
+ 
++    // Pablodebug
++    ChVector<> meanforce;
++    int forcecounts = 0;
++
+     // Process only hit nodes
+     for (auto& h : hits) {
+         ChVector2<> ij = h.first;
+@@ -1922,6 +2036,11 @@ void SCMLoader_Custom::ComputeInternalForces() {
+             Ft = T * m_area * nr.tau;
+         }
+ 
++        // Pablodebug
++        ChVector<> forcetest = Fn + Ft;
++        meanforce += forcetest;
++        forcecounts++;
++
+         if (ChBody* rigidbody = dynamic_cast<ChBody*>(contactable)) {
+             // [](){} Trick: no deletion for this shared ptr, since 'rigidbody' was not a new ChBody()
+             // object, but an already used pointer because mrayhit_result.hitModel->GetPhysicsItem()
+@@ -1965,6 +2084,9 @@ void SCMLoader_Custom::ComputeInternalForces() {
+ 
+     }  // end loop on ray hits
+ 
++    // Pablodebug
++    cout << "Mean force: " << meanforce/(float)forcecounts << endl;
++
+     m_timer_contact_forces.stop();
+ 
+     // --------------------------------------------------
+diff --git a/src/projects/polaris/scm_nn/SCMTerrain_Custom.h b/src/projects/polaris/scm_nn/SCMTerrain_Custom.h
+index ead2ec5f9..b377a8cf0 100644
+--- a/src/projects/polaris/scm_nn/SCMTerrain_Custom.h
++++ b/src/projects/polaris/scm_nn/SCMTerrain_Custom.h
+@@ -433,6 +433,8 @@ class CH_VEHICLE_API SCMLoader_Custom : public ChLoadContainer {
+         std::size_t operator()(const ChVector2<int>& p) const { return p.x() * 31 + p.y(); }
+     };
+ 
++    // Create visualization mesh
++    void CreateVisualizationMesh(double sizeX, double sizeY);
+ 
+     // Get the initial undeformed terrain height (relative to the SCM plane) at the specified grid node.
+     double GetInitHeight(const ChVector2<int>& loc) const;
+@@ -475,14 +477,13 @@ class CH_VEHICLE_API SCMLoader_Custom : public ChLoadContainer {
+ 
+     // Update the forces and the geometry, at the beginning of each timestep.
+     virtual void Setup() override {
+-      // if (m_use_nn){
+-      //   ComputeInternalForcesNN();
+-      // }
+-      // else{
+-      //   //TODO DENIZ switch back to Pablo's flag method once we have the working version. Done this way to minimize the code
+-      //   ComputeInternalForces();
+-      // }
+-      ComputeInternalForcesNN();
++      if (m_use_nn){
++        ComputeInternalForcesNN();
++      }
++      else{
++        ComputeInternalForces();
++      }
++      //ComputeInternalForcesNN();
+         ChLoadContainer::Update(ChTime, true);
+     }
+ 
+@@ -629,6 +630,26 @@ class CH_VEHICLE_API SCMLoader_Custom : public ChLoadContainer {
+     // Pablo, hardcoded
+     std::string m_terrain_dir = "terrain/scm/";
+ 
++    struct in_box {
++    in_box(const ChVector<>& box_pos, const ChMatrix33<>& box_rot, const ChVector<>& box_size)
++        : pos(box_pos), rot(box_rot), h(box_size / 2) {}
++
++    bool operator()(const ChAparticle* p) {
++        // Convert location in box frame
++        auto w = rot * (p->GetPos() - pos);
++
++        // Check w between all box limits
++        return (w.x() >= -h.x() && w.x() <= +h.x()) &&  //
++               (w.y() >= -h.y() && w.y() <= +h.y()) &&  //
++               (w.z() >= -h.z() && w.z() <= +h.z());
++    }
++
++    ChVector<> pos;
++    ChMatrix33<> rot;
++    ChVector<> h;
++    };
++
++
+     
+     
+ };
+diff --git a/src/projects/polaris/scm_nn/test_Polaris_SCM_CustomTerrain.cpp b/src/projects/polaris/scm_nn/test_Polaris_SCM_CustomTerrain.cpp
+index 6174e00c4..8b26914e1 100644
+--- a/src/projects/polaris/scm_nn/test_Polaris_SCM_CustomTerrain.cpp
++++ b/src/projects/polaris/scm_nn/test_Polaris_SCM_CustomTerrain.cpp
+@@ -191,7 +191,8 @@ int main(int argc, char* argv[]) {
+     // Create the terrain
+     // ------------------
+     // SCMDeformableTerrain terrain(system);
+-    SCMTerrain_Custom terrain(&sys, vehicle, false);
++    //SCMTerrain_Custom terrain(&sys, vehicle, false);
++    SCMTerrain_Custom terrain(&sys, vehicle);
+     terrain.SetSoilParameters(2e6,   // Bekker Kphi
+                                 0,     // Bekker Kc
+                                 1.1,   // Bekker n exponent

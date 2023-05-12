@@ -62,7 +62,7 @@ using std::endl;
 
 bool GetProblemSpecs(int argc,
                      char** argv,
-                     std::string& terrain_dir, double& tend, double& throttlemagnitude, double& steeringmagnitude, double& render_step_size, bool& heightmapterrain);
+                     std::string& terrain_dir, double& tend, double& throttlemagnitude, double& steeringmagnitude, double& render_step_size, bool& heightmapterrain, bool& use_nn);
 
 // =============================================================================
 // USER SETTINGS
@@ -84,6 +84,10 @@ double delta = 0.05;          // SCM grid spacing
 double throttlemagnitude=0.;
 double steeringmagnitude=0.;
 bool heightmapterrain=true;
+
+// Flag for using NN
+//bool use_nn = 1;
+bool use_nn = 0;
 
 // Initial vehicle position and orientation
 // Create vehicle
@@ -114,6 +118,42 @@ bool img_output = false;
 bool ver_output = true;
 
 // =============================================================================
+
+
+bool GetProblemSpecs(int argc,
+                     char** argv,
+                     std::string& terrain_dir, double& tend, double& throttlemagnitude, double& steeringmagnitude, double& render_step_size, bool& heightmapterrain, bool& use_nn) 
+    {
+    ChCLI cli(argv[0], "Polaris SCM terrain simulation");
+
+    cli.AddOption<std::string>("Problem setup", "terrain_dir", "Directory with terrain specification data");
+    cli.AddOption<double>("Simulation", "tend", "Simulation end time [s]", std::to_string(tend));
+    cli.AddOption<double>("Simulation", "throttlemagnitude", "Simulation throttle magnitude ", std::to_string(throttlemagnitude));
+    cli.AddOption<double>("Simulation", "steeringmagnitude", "Simulation steering magnitude ", std::to_string(steeringmagnitude));
+    cli.AddOption<double>("Simulation", "render_step_size", "Simulation render and output step size ", std::to_string(render_step_size));
+    cli.AddOption<bool>("Simulation", "use_nn", "Use NN for true or standard SCM for false", std::to_string(use_nn));
+    if (!cli.Parse(argc, argv)) {
+        cli.Help();
+        return false;
+    }
+
+    try {
+        terrain_dir = cli.Get("terrain_dir").as<std::string>();
+    } catch (std::domain_error&) {
+        cout << "\nERROR: Missing terrain specification directory!\n\n" << endl;
+        heightmapterrain=false;
+        // cli.Help();
+        // return false;
+    }
+    tend = cli.GetAsType<double>("tend");
+    throttlemagnitude = cli.GetAsType<double>("throttlemagnitude");
+    steeringmagnitude = cli.GetAsType<double>("steeringmagnitude");
+    render_step_size = cli.GetAsType<double>("render_step_size");
+    use_nn = cli.GetAsType<bool>("use_nn");
+
+
+    return true;
+}
 
 class MyDriver : public ChDriver {
   public:
@@ -158,7 +198,7 @@ int main(int argc, char* argv[]) {
     std::string terrain_dir;
     double tend = 0.5;
     if (!GetProblemSpecs(argc, argv,                                 
-                         terrain_dir, tend, throttlemagnitude, steeringmagnitude, render_step_size, heightmapterrain)) 
+                         terrain_dir, tend, throttlemagnitude, steeringmagnitude, render_step_size, heightmapterrain, use_nn)) 
     {
         return 1;
     }
@@ -190,9 +230,11 @@ int main(int argc, char* argv[]) {
     // ------------------
     // Create the terrain
     // ------------------
+
+    SCMTerrain_Custom terrain(&sys, vehicle, use_nn);
+    //SCMTerrain_Custom terrain(&sys, vehicle);
     // SCMDeformableTerrain terrain(system);
-    //SCMTerrain_Custom terrain(&sys, vehicle, false);
-    SCMTerrain_Custom terrain(&sys, vehicle);
+
     terrain.SetSoilParameters(2e6,   // Bekker Kphi
                                 0,     // Bekker Kc
                                 1.1,   // Bekker n exponent
@@ -335,41 +377,9 @@ int main(int argc, char* argv[]) {
         step_number++;
 
         //Pablo
-        //terrain.PrintStepStatistics(cout);
+        terrain.PrintStepStatistics(cout);
     }
 
     return 0;
 }
 
-bool GetProblemSpecs(int argc,
-                     char** argv,
-                     std::string& terrain_dir, double& tend, double& throttlemagnitude, double& steeringmagnitude, double& render_step_size, bool& heightmapterrain) 
-    {
-    ChCLI cli(argv[0], "Polaris SPH terrain simulation");
-
-    cli.AddOption<std::string>("Problem setup", "terrain_dir", "Directory with terrain specification data");
-    cli.AddOption<double>("Simulation", "tend", "Simulation end time [s]", std::to_string(tend));
-    cli.AddOption<double>("Simulation", "throttlemagnitude", "Simulation throttle magnitude ", std::to_string(throttlemagnitude));
-    cli.AddOption<double>("Simulation", "steeringmagnitude", "Simulation steering magnitude ", std::to_string(steeringmagnitude));
-    cli.AddOption<double>("Simulation", "render_step_size", "Simulation render and output step size ", std::to_string(render_step_size));
-    if (!cli.Parse(argc, argv)) {
-        cli.Help();
-        return false;
-    }
-
-    try {
-        terrain_dir = cli.Get("terrain_dir").as<std::string>();
-    } catch (std::domain_error&) {
-        cout << "\nERROR: Missing terrain specification directory!\n\n" << endl;
-        heightmapterrain=false;
-        // cli.Help();
-        // return false;
-    }
-    tend = cli.GetAsType<double>("tend");
-    throttlemagnitude = cli.GetAsType<double>("throttlemagnitude");
-    steeringmagnitude = cli.GetAsType<double>("steeringmagnitude");
-    render_step_size = cli.GetAsType<double>("render_step_size");
-
-
-    return true;
-}

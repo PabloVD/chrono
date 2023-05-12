@@ -98,7 +98,8 @@ class CH_VEHICLE_API SCMTerrain_Custom : public SCMTerrain {
     /// The user is responsible for calling various Set methods before Initialize.
     SCMTerrain_Custom(ChSystem* system,               ///< [in] containing multibody system
                std::shared_ptr<chrono::vehicle::WheeledVehicle> vehicle,
-               bool visualization_mesh = true  ///< [in] enable/disable visualization asset    
+               //bool visualization_mesh = true  ///< [in] enable/disable visualization asset    
+               bool use_nn = true  ///< use NN  
     );
 
     ~SCMTerrain_Custom() {}
@@ -338,7 +339,7 @@ class CH_VEHICLE_API SCMContactableData_Custom {
 /// Underlying implementation of the Soil Contact Model.
 class CH_VEHICLE_API SCMLoader_Custom : public ChLoadContainer {
   public:
-    SCMLoader_Custom(ChSystem* system, std::shared_ptr<WheeledVehicle> vehicle, bool visualization_mesh);
+    SCMLoader_Custom(ChSystem* system, std::shared_ptr<WheeledVehicle> vehicle, bool use_nn);
     ~SCMLoader_Custom() {}
 
     /// Initialize the terrain system (flat).
@@ -477,13 +478,7 @@ class CH_VEHICLE_API SCMLoader_Custom : public ChLoadContainer {
 
     // Update the forces and the geometry, at the beginning of each timestep.
     virtual void Setup() override {
-      if (m_use_nn){
-        ComputeInternalForcesNN();
-      }
-      else{
-        ComputeInternalForces();
-      }
-      //ComputeInternalForcesNN();
+      ComputeInternalForcesNN();
         ChLoadContainer::Update(ChTime, true);
     }
 
