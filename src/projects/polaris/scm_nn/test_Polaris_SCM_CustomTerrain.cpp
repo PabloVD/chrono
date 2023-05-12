@@ -219,7 +219,7 @@ int main(int argc, char* argv[]) {
 
     ////terrain.SetTexture(vehicle::GetDataFile("terrain/textures/grass.jpg"), 80, 16);
     ////terrain.SetPlotType(vehicle::SCMDeformableTerrain::PLOT_PRESSURE_YELD, 0, 30000.2);
-    terrain.SetPlotType(vehicle::SCMTerrain_Custom::PLOT_SINKAGE, 0, 0.1);
+    terrain.SetPlotType(vehicle::SCMTerrain_Custom::PLOT_SINKAGE, 0, 0.05);
 
     terrain.Initialize(terrainLength, terrainWidth, delta); 
 

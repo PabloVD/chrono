@@ -379,11 +379,8 @@ void SCMLoader_Custom::Initialize(double sizeX, double sizeY, double delta) {
     // Set default size and offset of sampling box
     double tire_radius = m_wheels[0]->GetTire()->GetRadius();
     double tire_width = m_wheels[0]->GetTire()->GetWidth();
-    // m_box_size.x() = 2.0 * std::sqrt(3.0) * tire_radius;
-    // m_box_size.y() = 1.5 * tire_width;
-    // m_box_size.z() = 2.2;
-    m_box_size.x() = 2.0;
-    m_box_size.y() = 1.5;
+    m_box_size.x() = 1.0;
+    m_box_size.y() = 1.0;
     m_box_size.z() = 2.2;
     m_box_offset = ChVector<>(0.0, 0.0, 0.0);
 
@@ -398,6 +395,7 @@ void SCMLoader_Custom::Initialize(double sizeX, double sizeY, double delta) {
     }
 
     std::string NN_module_name = "wrapped_gnn_onlydef.pt";
+    //std::string NN_module_name = "wrapped_gnn_onlydef_rollout.pt";
     Load(vehicle::GetDataFile(m_terrain_dir + NN_module_name));
     // Pablo
     Create(m_terrain_dir,true);
@@ -804,6 +802,23 @@ void SCMLoader_Custom::ComputeInternalForcesNN() {
     m_contact_forces.clear();
 
     // ---------------------
+    // Update moving patches
+    // ---------------------
+
+    m_timer_moving_patches.start();
+
+    // Update patch information (find range of grid indices)
+    if (m_moving_patch) {
+        for (auto& p : m_patches)
+            UpdateMovingPatch(p, m_Z);
+    } else {
+        assert(m_patches.size() == 1);
+        UpdateFixedPatch(m_patches[0]);
+    }
+
+    m_timer_moving_patches.stop();
+
+    // ---------------------
     // NN computation
     // ---------------------
 
@@ -836,6 +851,8 @@ void SCMLoader_Custom::ComputeInternalForcesNN() {
     ChMatrix33<> rot;
     ChVector<> h;
     };
+
+    //if (m_use_nn){
 
     // Prepare NN model inputs
     const auto& p_all = m_particles->GetParticles();
@@ -972,6 +989,9 @@ void SCMLoader_Custom::ComputeInternalForcesNN() {
        auto p_new = m_particle_positions[i][j];
     //    std::cout<<"p_current= "<<p_current<<std::endl;
     //    std::cout<<"p_new= "<<p_new<<std::endl;
+
+
+        // Debug Pablo
        m_wheel_particles[i][j]->SetPos(p_new); 
 
 
@@ -982,9 +1002,6 @@ void SCMLoader_Custom::ComputeInternalForcesNN() {
         }
     } 
 
-    int numnewhits = (int)newhits.size();
-    std::cout << "Num newhits: " << numnewhits << std::endl;
-
     // Sequential insertion in global hits
     for (auto& h : newhits) {
         // If this is the first hit from this node, initialize the node record
@@ -994,27 +1011,14 @@ void SCMLoader_Custom::ComputeInternalForcesNN() {
         }
     }
 
+    //}
+
     //std::cout << "NN inputs:" << inputs << std::endl;
 
 
     // Pablo end modified part
 
-    // ---------------------
-    // Update moving patches
-    // ---------------------
-
-    m_timer_moving_patches.start();
-
-    // Update patch information (find range of grid indices)
-    if (m_moving_patch) {
-        for (auto& p : m_patches)
-            UpdateMovingPatch(p, m_Z);
-    } else {
-        assert(m_patches.size() == 1);
-        UpdateFixedPatch(m_patches[0]);
-    }
-
-    m_timer_moving_patches.stop();
+    
 
     // -------------------------
     // Perform ray casting tests
@@ -1081,11 +1085,13 @@ void SCMLoader_Custom::ComputeInternalForcesNN() {
         for (int t_num = 0; t_num < nthreads; t_num++) {
             for (auto& h : t_hits[t_num]) {
                 // If this is the first hit from this node, initialize the node record
-                // if (m_grid_map.find(h.first) == m_grid_map.end()) {
-                //     double z = GetInitHeight(h.first);
-                //     m_grid_map.insert(std::make_pair(h.first, NodeRecord(z, z, GetInitNormal(h.first))));
-                // }
-                ////hits.insert(h);
+                if (m_use_nn == 0){
+                if (m_grid_map.find(h.first) == m_grid_map.end()) {
+                    double z = GetInitHeight(h.first);
+                    m_grid_map.insert(std::make_pair(h.first, NodeRecord(z, z, GetInitNormal(h.first))));
+                }
+                }
+                //hits.insert(h);
             }
 
             hits.insert(t_hits[t_num].begin(), t_hits[t_num].end());
@@ -1093,6 +1099,9 @@ void SCMLoader_Custom::ComputeInternalForcesNN() {
         }
         m_num_ray_hits = (int)hits.size();
     }
+
+    
+
 
 
     m_timer_ray_casting.stop();
@@ -1193,7 +1202,12 @@ void SCMLoader_Custom::ComputeInternalForcesNN() {
     double damping_R = m_damping_R;
 
     
-    int newhit_ind = 0;
+    if (m_use_nn == 0){
+        std::unordered_map<ChVector2<int>, HitRecord, CoordHash> newhits = hits;
+    }
+
+    int numnewhits = (int)newhits.size();
+    std::cout << "Num newhits: " << numnewhits << std::endl;
 
     // Process only hit nodes
     //for (auto& h : hits) {
@@ -1321,6 +1335,7 @@ void SCMLoader_Custom::ComputeInternalForcesNN() {
             } else {
                 // Update generalized force.
                 ChVector<> force = Fn + Ft;
+                //cout << force << endl;
                 itr->second.force += force;
                 itr->second.moment += Vcross(Vsub(point_abs, srigidbody->GetPos()), force);
             }
