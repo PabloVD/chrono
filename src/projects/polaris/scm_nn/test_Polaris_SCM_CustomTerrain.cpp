@@ -86,8 +86,8 @@ double steeringmagnitude=0.;
 bool heightmapterrain=true;
 
 // Flag for using NN
-//bool use_nn = 1;
-bool use_nn = 0;
+bool use_nn = 1;
+//bool use_nn = 0;
 
 // Initial vehicle position and orientation
 // Create vehicle
@@ -340,23 +340,23 @@ int main(int argc, char* argv[]) {
         if (ver_output)
             data_writer.Process(step_number, t); 
         
-        // if (step_number % render_steps == 0) {
-        //     if (ver_output)
-        //     {   
-        //     std::string vertices_filename = out_dir +  "/vertices_" + std::to_string(render_frame) + ".csv";
-        //     if (step_number==0)
-        //      terrain.WriteMeshVertices(vertices_filename);
-        //     else
-        //      terrain.WriteMeshVerticesinz(vertices_filename);
-        //     }
-        //     if (img_output% render_steps == 0)
-        //     {
-        //     char filename[100];
-        //     sprintf(filename, "%s/img_%03d.jpg", img_dir.c_str(), render_frame + 1);
-        //     vis->WriteImageToFile(filename);
-        //     }
-        //     render_frame++;
-        // }
+        if (step_number % render_steps == 0) {
+            if (ver_output)
+            {   
+            std::string vertices_filename = out_dir +  "/vertices_" + std::to_string(render_frame) + ".csv";
+            if (step_number==0)
+             terrain.WriteMeshVertices(vertices_filename);
+            else
+             terrain.WriteMeshVerticesinz(vertices_filename);
+            }
+            if (img_output% render_steps == 0)
+            {
+            char filename[100];
+            sprintf(filename, "%s/img_%03d.jpg", img_dir.c_str(), render_frame + 1);
+            vis->WriteImageToFile(filename);
+            }
+            render_frame++;
+        }
 
         // // Driver inputs
         DriverInputs driver_inputs = driver.GetInputs();
@@ -376,8 +376,8 @@ int main(int argc, char* argv[]) {
         // Increment frame number
         step_number++;
 
-        //Pablo
-        terrain.PrintStepStatistics(cout);
+        // Pablo
+        //terrain.PrintStepStatistics(cout);
     }
 
     return 0;

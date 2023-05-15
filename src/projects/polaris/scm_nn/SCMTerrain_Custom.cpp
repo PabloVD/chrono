@@ -297,7 +297,45 @@ void SCMTerrain_Custom::RegisterSoilParametersCallback(std::shared_ptr<SoilParam
     m_loader->m_soil_fun = cb;
 }
 
+// Save the vertices of the visualization mesh as a csv file.
+void SCMTerrain_Custom::WriteMeshVertices(const std::string& filename) const{
+    if (!m_loader->m_trimesh_shape) {
+        std::cout << "SCMTerrain::WriteMeshVertices  -- visualization mesh not created.";
+        return;
+    }
+    std::ofstream mf(filename);
+    mf <<"#x,y,z"<< std::endl;
+    auto trimesh = m_loader->m_trimesh_shape->GetMesh();
+    std::vector<geometry::ChTriangleMeshConnected> meshes = {*trimesh};
+    int v_counter = 0;
+    for (auto& m : meshes) {
+        for (auto& v : m.m_vertices) {
+            mf << v.x() << ", " << v.y() << ", " << v.z() << std::endl;
+            v_counter++;
+        }
+    }
+    mf.close();
+}
 
+// Save the vertices of the visualization mesh as a csv file.
+void SCMTerrain_Custom::WriteMeshVerticesinz(const std::string& filename) const{
+    if (!m_loader->m_trimesh_shape) {
+        std::cout << "SCMTerrain::WriteMeshVertices  -- visualization mesh not created.";
+        return;
+    }
+    std::ofstream mf(filename);
+    mf <<"#z"<< std::endl;
+    auto trimesh = m_loader->m_trimesh_shape->GetMesh();
+    std::vector<geometry::ChTriangleMeshConnected> meshes = {*trimesh};
+    int v_counter = 0;
+    for (auto& m : meshes) {
+        for (auto& v : m.m_vertices) {
+            mf << v.z() << std::endl;
+            v_counter++;
+        }
+    }
+    mf.close();
+}
 
 // -----------------------------------------------------------------------------
 // Contactable user-data (contactable-soil parameters)
@@ -385,8 +423,7 @@ SCMLoader_Custom::SCMLoader_Custom(ChSystem* system, std::shared_ptr<WheeledVehi
 // Initialize the terrain as a flat grid
 void SCMLoader_Custom::Initialize(double sizeX, double sizeY, double delta) {
     m_type = PatchType::FLAT;
-    m_delta=delta;
-
+    
     // Flag to use NN
     //m_use_nn = 0;
     //m_use_nn = 1;
@@ -400,6 +437,9 @@ void SCMLoader_Custom::Initialize(double sizeX, double sizeY, double delta) {
         m_box_size.y() = 0.5;
         m_box_size.z() = 2.2;
         m_box_offset = ChVector<>(0.0, 0.0, 0.0);
+
+        m_delta = delta;
+        m_area = std::pow(m_delta, 2);  // area of a cell
         
         std::string NN_module_name = "wrapped_gnn_onlydef.pt";
         std::cout << "Using NN " << NN_module_name << std::endl;
@@ -407,6 +447,7 @@ void SCMLoader_Custom::Initialize(double sizeX, double sizeY, double delta) {
         Load(vehicle::GetDataFile(m_terrain_dir + NN_module_name));
         // Pablo
         Create(m_terrain_dir,true);
+
     }
     else{
         std::cout << "Using standard SCM" << std::endl;
@@ -981,8 +1022,6 @@ void SCMLoader_Custom::ComputeInternalForcesNN() {
 
     if (m_use_nn){
 
-    
-
     // Prepare NN model inputs
     const auto& p_all = m_particles->GetParticles();
     std::vector<torch::jit::IValue> inputs;
@@ -1384,7 +1423,10 @@ void SCMLoader_Custom::ComputeInternalForcesNN() {
     double damping_R = m_damping_R;
 
     // Pablodebug
-    ChVector<> meanforce;
+    ChVector<> meanforce = ChVector<>(0,0,0);
+    float sigma_mean = 0.;
+    float tau_mean = 0.;
+    float area_mean = 0.;
     int forcecounts = 0;
 
     if (m_use_nn == 0){
@@ -1495,6 +1537,8 @@ void SCMLoader_Custom::ComputeInternalForcesNN() {
         // Pablodebug
         ChVector<> forcetest = Fn + Ft;
         meanforce += forcetest;
+        sigma_mean += nr.sigma;
+        tau_mean += nr.tau;
         forcecounts++;
 
         if (ChBody* rigidbody = dynamic_cast<ChBody*>(contactable)) {
@@ -1541,7 +1585,8 @@ void SCMLoader_Custom::ComputeInternalForcesNN() {
     }  // end loop on ray hits
 
     // Pablodebug
-    cout << "Mean force: " << meanforce/(float)forcecounts << endl;
+    //cout << "Mean force: " << meanforce/(float)forcecounts << ", " << sigma_mean/(float)forcecounts << ", " << tau_mean/(float)forcecounts << endl;
+    cout << "Mean force: " << meanforce << endl;
 
     m_timer_contact_forces.stop();
 

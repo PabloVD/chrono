@@ -307,9 +307,13 @@ class CH_VEHICLE_API SCMTerrain_Custom : public SCMTerrain {
     /// Print timing and counter information for last step.
     void PrintStepStatistics(std::ostream& os) const;
 
-
-
     std::shared_ptr<SCMLoader_Custom> GetSCMLoader() const { return m_loader; }
+
+    /// Save the vertices of the visualization mesh as a csv file.
+    void WriteMeshVertices(const std::string& filename) const;
+
+    /// Save the vertices of the visualization mesh as a csv file.
+    void WriteMeshVerticesinz(const std::string& filename) const;
 
   private:
     std::shared_ptr<SCMLoader_Custom> m_loader;  ///< underlying load container for contact force generation
