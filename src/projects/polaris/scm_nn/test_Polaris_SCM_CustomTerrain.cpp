@@ -62,36 +62,34 @@ using std::endl;
 
 bool GetProblemSpecs(int argc,
                      char** argv,
-                     std::string& terrain_dir, double& tend, double& throttlemagnitude, double& steeringmagnitude, double& render_step_size, bool& heightmapterrain, bool& use_nn);
+                     std::string& terrain_dir, double& tend, double& throttlemagnitude, double& steeringmagnitude, double& render_step_size, bool& heightmapterrain, double& initheight, bool& use_nn);
 
 // =============================================================================
 // USER SETTINGS
 // =============================================================================
 
 // -----------------------------------------------------------------------------
-// Terrain parameters
+// Default terrain parameters
 // -----------------------------------------------------------------------------
 
+std::string terrain_dir;
+double tend = 0.5;
 // double terrainLength = 16.0;  // size in X direction
-// double terrainWidth = 8.0;    // size in Y direction
-// double terrainLength = 8.0;  // size in X direction
-double terrainLength = 16.0;  // size in X direction
-double terrainWidth = 4.0;    // size in Y direction
-// double terrainLength = 32.0;  // size in X direction
-// double terrainWidth = 16.0;    // size in Y direction
+// double terrainWidth = 4.0;    // size in Y direction
+double terrainLength = 35.0;  // size in X direction
+double terrainWidth = 17.5;    // size in Y direction
 double delta = 0.05;          // SCM grid spacing
 
 double throttlemagnitude=0.;
 double steeringmagnitude=0.;
 bool heightmapterrain=true;
+double initheight=0.1;
+//double maxheight = 0.5;
+double maxheight = 1.5*35.0/40.0;
 
 // Flag for using NN
-bool use_nn = 1;
-//bool use_nn = 0;
-
-// Initial vehicle position and orientation
-// Create vehicle
-ChCoordsys<> init_pos(ChVector<>(1.3, 0, 0.1), QUNIT);
+//bool use_nn = 1;
+bool use_nn = 0;
 
 // -----------------------------------------------------------------------------
 // Simulation parameters
@@ -122,7 +120,7 @@ bool ver_output = true;
 
 bool GetProblemSpecs(int argc,
                      char** argv,
-                     std::string& terrain_dir, double& tend, double& throttlemagnitude, double& steeringmagnitude, double& render_step_size, bool& heightmapterrain, bool& use_nn) 
+                     std::string& terrain_dir, double& tend, double& throttlemagnitude, double& steeringmagnitude, double& render_step_size, bool& heightmapterrain, double& initheight, bool& use_nn) 
     {
     ChCLI cli(argv[0], "Polaris SCM terrain simulation");
 
@@ -131,6 +129,7 @@ bool GetProblemSpecs(int argc,
     cli.AddOption<double>("Simulation", "throttlemagnitude", "Simulation throttle magnitude ", std::to_string(throttlemagnitude));
     cli.AddOption<double>("Simulation", "steeringmagnitude", "Simulation steering magnitude ", std::to_string(steeringmagnitude));
     cli.AddOption<double>("Simulation", "render_step_size", "Simulation render and output step size ", std::to_string(render_step_size));
+    cli.AddOption<double>("Simulation", "initheight", "Spawning height in meters ", std::to_string(initheight));
     cli.AddOption<bool>("Simulation", "use_nn", "Use NN for true or standard SCM for false", std::to_string(use_nn));
     if (!cli.Parse(argc, argv)) {
         cli.Help();
@@ -149,6 +148,7 @@ bool GetProblemSpecs(int argc,
     throttlemagnitude = cli.GetAsType<double>("throttlemagnitude");
     steeringmagnitude = cli.GetAsType<double>("steeringmagnitude");
     render_step_size = cli.GetAsType<double>("render_step_size");
+    initheight = cli.GetAsType<double>("initheight");
     use_nn = cli.GetAsType<bool>("use_nn");
 
 
@@ -195,10 +195,9 @@ class MyDriver : public ChDriver {
 
 int main(int argc, char* argv[]) {
     GetLog() << "Copyright (c) 2017 projectchrono.org\nChrono version: " << CHRONO_VERSION << "\n\n";
-    std::string terrain_dir;
-    double tend = 0.5;
+    
     if (!GetProblemSpecs(argc, argv,                                 
-                         terrain_dir, tend, throttlemagnitude, steeringmagnitude, render_step_size, heightmapterrain, use_nn)) 
+                         terrain_dir, tend, throttlemagnitude, steeringmagnitude, render_step_size, heightmapterrain, initheight, use_nn)) 
     {
         return 1;
     }
@@ -222,6 +221,21 @@ int main(int argc, char* argv[]) {
     // --------------------
     // Create the Polaris vehicle
     // --------------------
+
+    cout << "Create vehicle..." << endl;
+    // Initial vehicle position and orientation
+    //ChCoordsys<> init_pos(ChVector<>(1.3, 0, 0.1), QUNIT);
+
+    // First ensure that the vehicle spawns above the floor
+    // ChVector<> initLoc0(4.-terrainLength/2.0, 0, initheight);
+    // double terrainheightspawn = terrain.GetHeight(initLoc0);
+    // cout << "Height terrain in spawn point: " << terrainheightspawn << endl;
+
+    // ChVector<> initLoc(4.-terrainLength/2.0, 0, initheight + terrainheightspawn);
+    ChVector<> initLoc(4.-terrainLength/2.0, 0, initheight + maxheight);
+    ChQuaternion<> initRot(1, 0, 0, 0); // Same than QUNIT
+    ChCoordsys<> init_pos(initLoc, initRot);
+
     cout << "Create vehicle..." << endl;
     auto vehicle = CreateVehicle(sys, init_pos);
     double x_max = (terrainLength/2.0 - 3.0);
@@ -264,7 +278,20 @@ int main(int argc, char* argv[]) {
     ////terrain.SetPlotType(vehicle::SCMDeformableTerrain::PLOT_PRESSURE_YELD, 0, 30000.2);
     terrain.SetPlotType(vehicle::SCMTerrain_Custom::PLOT_SINKAGE, 0, 0.05);
 
-    terrain.Initialize(terrainLength, terrainWidth, delta); 
+    if (heightmapterrain)
+    { 
+     terrain.Initialize(terrain_dir,  ///< [in] filename for the height map (image file)
+                    terrainLength ,                       ///< [in] terrain dimension in the X direction
+                    terrainWidth,                       ///< [in] terrain dimension in the Y direction
+                    0.0,                        ///< [in] minimum height (black level)
+                    maxheight,                        ///< [in] maximum height (white level)
+                    delta                        ///< [in] grid spacing (may be slightly decreased)
+     );        
+    }
+    else
+    {
+     terrain.Initialize(terrainLength, terrainWidth, delta);    
+    }
 
 
     // std::string vertices_filename = out_dir +  "/vertices_" + std::to_string(0) + ".csv";
@@ -285,7 +312,7 @@ int main(int argc, char* argv[]) {
     // --------------------
     // Create driver system
     // --------------------
-    MyDriver driver(*vehicle, 1.);
+    MyDriver driver(*vehicle, 0.5);
     driver.Initialize();
 
     // -----------------
@@ -377,7 +404,7 @@ int main(int argc, char* argv[]) {
         step_number++;
 
         // Pablo
-        //terrain.PrintStepStatistics(cout);
+        terrain.PrintStepStatistics(cout);
     }
 
     return 0;
