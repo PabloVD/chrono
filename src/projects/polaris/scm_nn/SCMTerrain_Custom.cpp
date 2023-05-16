@@ -49,9 +49,14 @@ namespace vehicle {
 // Implementation of the SCMTerrain_Custom wrapper class
 // -----------------------------------------------------------------------------
 
-SCMTerrain_Custom::SCMTerrain_Custom(ChSystem* system, std::shared_ptr<WheeledVehicle> vehicle, bool visualization_mesh) :SCMTerrain(system,visualization_mesh) {
-    m_loader = chrono_types::make_shared<SCMLoader_Custom>(system, vehicle, visualization_mesh);
+SCMTerrain_Custom::SCMTerrain_Custom(ChSystem* system, bool visualization_mesh) :SCMTerrain(system,visualization_mesh) {
+    m_loader = chrono_types::make_shared<SCMLoader_Custom>(system, visualization_mesh);
     system->Add(m_loader);    
+}
+
+// Initialize the terrain as a flat grid.
+void SCMTerrain_Custom::EnterVehicle(std::shared_ptr<WheeledVehicle> vehicle) {
+    m_loader->EnterVehicle(vehicle);
 }
 
 // Get the initial terrain height below the specified location.
@@ -365,7 +370,7 @@ SCMContactableData_Custom::SCMContactableData_Custom(double area_ratio,
 // -----------------------------------------------------------------------------
 
 // Constructor.
-SCMLoader_Custom::SCMLoader_Custom(ChSystem* system, std::shared_ptr<WheeledVehicle> vehicle, bool use_nn) : m_sys(system), m_vehicle(vehicle), m_soil_fun(nullptr) {
+SCMLoader_Custom::SCMLoader_Custom(ChSystem* system, bool use_nn) : m_sys(system), m_soil_fun(nullptr) {
     this->SetSystem(system);
 
     std::cout << "Inside SCMLoader_Custom" << std::endl;
@@ -418,16 +423,29 @@ SCMLoader_Custom::SCMLoader_Custom(ChSystem* system, std::shared_ptr<WheeledVehi
 
     m_moving_patch = false;
 
+    m_use_nn = use_nn;
+
+}
+
+//TODO Deniz - make sure that this function is called always before running the simulation.
+void SCMLoader_Custom::EnterVehicle(std::shared_ptr<WheeledVehicle> vehicle) {
+
+    m_vehicle=vehicle;
+
     // Pablo
     m_wheels[0] = m_vehicle->GetWheel(0, LEFT);
     m_wheels[1] = m_vehicle->GetWheel(0, RIGHT);
     m_wheels[2] = m_vehicle->GetWheel(1, LEFT);
     m_wheels[3] = m_vehicle->GetWheel(1, RIGHT);
 
-    m_use_nn = use_nn;
-
+    // Set default size and offset of sampling box
+    double tire_radius = m_wheels[0]->GetTire()->GetRadius();
+    double tire_width = m_wheels[0]->GetTire()->GetWidth();
+    m_box_size.x() = 0.5;
+    m_box_size.y() = 0.5;
+    m_box_size.z() = 2.2;
+    m_box_offset = ChVector<>(0.0, 0.0, 0.0);
 }
-
 
 // Pablorewrite
 // Initialize the terrain as a flat grid
@@ -439,14 +457,6 @@ void SCMLoader_Custom::Initialize(double sizeX, double sizeY, double delta) {
     //m_use_nn = 1;
 
     if (m_use_nn){
-
-        // Set default size and offset of sampling box
-        double tire_radius = m_wheels[0]->GetTire()->GetRadius();
-        double tire_width = m_wheels[0]->GetTire()->GetWidth();
-        m_box_size.x() = 0.5;
-        m_box_size.y() = 0.5;
-        m_box_size.z() = 2.2;
-        m_box_offset = ChVector<>(0.0, 0.0, 0.0);
 
         m_delta = delta;
         m_area = std::pow(m_delta, 2);  // area of a cell

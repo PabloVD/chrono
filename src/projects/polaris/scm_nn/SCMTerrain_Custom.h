@@ -97,12 +97,14 @@ class CH_VEHICLE_API SCMTerrain_Custom : public SCMTerrain {
     /// Construct a default SCM deformable terrain.
     /// The user is responsible for calling various Set methods before Initialize.
     SCMTerrain_Custom(ChSystem* system,               ///< [in] containing multibody system
-               std::shared_ptr<chrono::vehicle::WheeledVehicle> vehicle,
+               //std::shared_ptr<chrono::vehicle::WheeledVehicle> vehicle,
                //bool visualization_mesh = true  ///< [in] enable/disable visualization asset    
                bool use_nn = true  ///< use NN  
     );
 
     ~SCMTerrain_Custom() {}
+
+    void EnterVehicle(std::shared_ptr<WheeledVehicle> vehicle);
 
     /// Set the plane reference.
     /// By default, the reference plane is horizontal with Z up (ISO vehicle reference frame).
@@ -343,8 +345,10 @@ class CH_VEHICLE_API SCMContactableData_Custom {
 /// Underlying implementation of the Soil Contact Model.
 class CH_VEHICLE_API SCMLoader_Custom : public ChLoadContainer {
   public:
-    SCMLoader_Custom(ChSystem* system, std::shared_ptr<WheeledVehicle> vehicle, bool use_nn);
+    SCMLoader_Custom(ChSystem* system, bool use_nn);
     ~SCMLoader_Custom() {}
+
+    void EnterVehicle(std::shared_ptr<WheeledVehicle> vehicle);
 
     /// Initialize the terrain system (flat).
     /// This version creates a flat array of points.

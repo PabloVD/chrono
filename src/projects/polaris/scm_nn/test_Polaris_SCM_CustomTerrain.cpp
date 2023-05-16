@@ -210,6 +210,8 @@ int main(int argc, char* argv[]) {
     bool verbose = true;
     bool wheel_output = true;      // save individual wheel output files
     double output_major_fps = 1.0/render_step_size;
+
+
     // --------------------
     // Create the Chrono systems
     // --------------------
@@ -218,34 +220,12 @@ int main(int argc, char* argv[]) {
     const ChVector<> gravity(0, 0, -9.81);
     sys.Set_G_acc(gravity);
 
-    // --------------------
-    // Create the Polaris vehicle
-    // --------------------
-
-    cout << "Create vehicle..." << endl;
-    // Initial vehicle position and orientation
-    //ChCoordsys<> init_pos(ChVector<>(1.3, 0, 0.1), QUNIT);
-
-    // First ensure that the vehicle spawns above the floor
-    // ChVector<> initLoc0(4.-terrainLength/2.0, 0, initheight);
-    // double terrainheightspawn = terrain.GetHeight(initLoc0);
-    // cout << "Height terrain in spawn point: " << terrainheightspawn << endl;
-
-    // ChVector<> initLoc(4.-terrainLength/2.0, 0, initheight + terrainheightspawn);
-    ChVector<> initLoc(4.-terrainLength/2.0, 0, initheight + maxheight);
-    ChQuaternion<> initRot(1, 0, 0, 0); // Same than QUNIT
-    ChCoordsys<> init_pos(initLoc, initRot);
-
-    cout << "Create vehicle..." << endl;
-    auto vehicle = CreateVehicle(sys, init_pos);
-    double x_max = (terrainLength/2.0 - 3.0);
-    double y_max = (terrainWidth/2.0 - 3.0);
 
     // ------------------
     // Create the terrain
     // ------------------
 
-    SCMTerrain_Custom terrain(&sys, vehicle, use_nn);
+    SCMTerrain_Custom terrain(&sys, use_nn);
     //SCMTerrain_Custom terrain(&sys, vehicle);
     // SCMDeformableTerrain terrain(system);
 
@@ -292,6 +272,30 @@ int main(int argc, char* argv[]) {
     {
      terrain.Initialize(terrainLength, terrainWidth, delta);    
     }
+
+    // --------------------
+    // Create the Polaris vehicle
+    // --------------------
+
+    cout << "Create vehicle..." << endl;
+    // Initial vehicle position and orientation
+    //ChCoordsys<> init_pos(ChVector<>(1.3, 0, 0.1), QUNIT);
+
+    // First find height in the spawn point to ensure that the vehicle spawns above the floor
+    ChVector<> initLoc0(4.-terrainLength/2.0, 0, initheight);
+    double terrainheightspawn = terrain.GetHeight(initLoc0);
+    // cout << "Height terrain in spawn point: " << terrainheightspawn << endl;
+
+    ChVector<> initLoc(4.-terrainLength/2.0, 0, initheight + terrainheightspawn);
+    ChQuaternion<> initRot(1, 0, 0, 0); // Same than QUNIT
+    ChCoordsys<> init_pos(initLoc, initRot);
+
+    cout << "Create vehicle..." << endl;
+    auto vehicle = CreateVehicle(sys, init_pos);
+    double x_max = (terrainLength/2.0 - 3.0);
+    double y_max = (terrainWidth/2.0 - 3.0);
+
+    terrain.EnterVehicle(vehicle);
 
 
     // std::string vertices_filename = out_dir +  "/vertices_" + std::to_string(0) + ".csv";
@@ -404,7 +408,7 @@ int main(int argc, char* argv[]) {
         step_number++;
 
         // Pablo
-        terrain.PrintStepStatistics(cout);
+        //terrain.PrintStepStatistics(cout);
     }
 
     return 0;
