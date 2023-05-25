@@ -98,7 +98,7 @@ class CH_VEHICLE_API SCMTerrain_Custom : public SCMTerrain {
     /// The user is responsible for calling various Set methods before Initialize.
     SCMTerrain_Custom(ChSystem* system,               ///< [in] containing multibody system
                //std::shared_ptr<chrono::vehicle::WheeledVehicle> vehicle,
-               //bool visualization_mesh = true  ///< [in] enable/disable visualization asset    
+               bool visualization_mesh = true,  ///< [in] enable/disable visualization asset    
                bool use_nn = true  ///< use NN  
     );
 
@@ -345,7 +345,7 @@ class CH_VEHICLE_API SCMContactableData_Custom {
 /// Underlying implementation of the Soil Contact Model.
 class CH_VEHICLE_API SCMLoader_Custom : public ChLoadContainer {
   public:
-    SCMLoader_Custom(ChSystem* system, bool use_nn);
+    SCMLoader_Custom(ChSystem* system, bool visualization_mesh, bool use_nn);
     ~SCMLoader_Custom() {}
 
     void EnterVehicle(std::shared_ptr<WheeledVehicle> vehicle);
@@ -486,7 +486,7 @@ class CH_VEHICLE_API SCMLoader_Custom : public ChLoadContainer {
 
     // Update the forces and the geometry, at the beginning of each timestep.
     virtual void Setup() override {
-      ComputeInternalForcesNN();
+      ComputeInternalForces();
         ChLoadContainer::Update(ChTime, true);
     }
 
@@ -511,9 +511,8 @@ class CH_VEHICLE_API SCMLoader_Custom : public ChLoadContainer {
     // Reset the list of forces and fill it with forces from the soil contact model.
     // This is called automatically during timestepping (only at the beginning of each step).
 
-    void ComputeInternalForcesNN();
-
     void ComputeInternalForces();
+
 
 
     // Override the ChLoadContainer method for computing the generalized force F term:
@@ -610,6 +609,7 @@ class CH_VEHICLE_API SCMLoader_Custom : public ChLoadContainer {
     ChTimer m_timer_bulldozing_erosion;
     ChTimer m_timer_visualization;
     int m_num_ray_casts;
+    int m_num_ray_oldhits;
     int m_num_ray_hits;
     int m_num_contact_patches;
     int m_num_erosion_nodes;
@@ -629,6 +629,8 @@ class CH_VEHICLE_API SCMLoader_Custom : public ChLoadContainer {
     std::array<std::vector<ChVector<>>, 4> m_particle_positions;
     std::array<TerrainForce, 4> m_tire_forces;
     bool m_verbose;
+    double tire_radius;
+    double tire_width;
 
     // Pablo, hardcoded
     std::string m_terrain_dir = "terrain/scm/";

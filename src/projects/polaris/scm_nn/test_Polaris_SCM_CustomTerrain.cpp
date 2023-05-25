@@ -74,8 +74,9 @@ bool GetProblemSpecs(int argc,
 
 std::string terrain_dir;
 double tend = 0.5;
-// double terrainLength = 16.0;  // size in X direction
-// double terrainWidth = 4.0;    // size in Y direction
+
+// double terrainLength = 8.0;  // size in X direction
+// double terrainWidth = 3.0;    // size in Y direction
 double terrainLength = 35.0;  // size in X direction
 double terrainWidth = 17.5;    // size in Y direction
 double delta = 0.05;          // SCM grid spacing
@@ -225,7 +226,7 @@ int main(int argc, char* argv[]) {
     // Create the terrain
     // ------------------
 
-    SCMTerrain_Custom terrain(&sys, use_nn);
+    SCMTerrain_Custom terrain(&sys, true, use_nn);
     //SCMTerrain_Custom terrain(&sys, vehicle);
     // SCMDeformableTerrain terrain(system);
 
@@ -236,6 +237,7 @@ int main(int argc, char* argv[]) {
                                 30,    // Mohr friction limit (degrees)
                                 0.01,  // Janosi shear coefficient (m)
                                 2e8,   // Elastic stiffness (Pa/m), before plastic yield
+                                //0       // Damping (Pa s/m), proportional to negative vertical speed (optional)
                                 3e4    // Damping (Pa s/m), proportional to negative vertical speed (optional)
     );
 
@@ -282,11 +284,13 @@ int main(int argc, char* argv[]) {
     //ChCoordsys<> init_pos(ChVector<>(1.3, 0, 0.1), QUNIT);
 
     // First find height in the spawn point to ensure that the vehicle spawns above the floor
-    ChVector<> initLoc0(4.-terrainLength/2.0, 0, initheight);
+    //double init_x = 4.-terrainLength/2.0;
+    double init_x = 0.;
+    ChVector<> initLoc0(init_x, 0, initheight);
     double terrainheightspawn = terrain.GetHeight(initLoc0);
     // cout << "Height terrain in spawn point: " << terrainheightspawn << endl;
 
-    ChVector<> initLoc(4.-terrainLength/2.0, 0, initheight + terrainheightspawn);
+    ChVector<> initLoc(init_x, 0, initheight + terrainheightspawn);
     ChQuaternion<> initRot(1, 0, 0, 0); // Same than QUNIT
     ChCoordsys<> init_pos(initLoc, initRot);
 

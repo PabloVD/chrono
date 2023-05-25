@@ -49,8 +49,8 @@ namespace vehicle {
 // Implementation of the SCMTerrain_Custom wrapper class
 // -----------------------------------------------------------------------------
 
-SCMTerrain_Custom::SCMTerrain_Custom(ChSystem* system, bool visualization_mesh) :SCMTerrain(system,visualization_mesh) {
-    m_loader = chrono_types::make_shared<SCMLoader_Custom>(system, visualization_mesh);
+SCMTerrain_Custom::SCMTerrain_Custom(ChSystem* system, bool visualization_mesh, bool use_nn) :SCMTerrain(system,visualization_mesh) {
+    m_loader = chrono_types::make_shared<SCMLoader_Custom>(system, visualization_mesh, use_nn);
     system->Add(m_loader);    
 }
 
@@ -370,21 +370,13 @@ SCMContactableData_Custom::SCMContactableData_Custom(double area_ratio,
 // -----------------------------------------------------------------------------
 
 // Constructor.
-SCMLoader_Custom::SCMLoader_Custom(ChSystem* system, bool use_nn) : m_sys(system), m_soil_fun(nullptr) {
+SCMLoader_Custom::SCMLoader_Custom(ChSystem* system, bool visualization_mesh, bool use_nn) : m_sys(system), m_soil_fun(nullptr) {
     this->SetSystem(system);
 
     std::cout << "Inside SCMLoader_Custom" << std::endl;
     std::cout << "cuda version " << scatter::cuda_version() << std::endl;
     torch::Tensor tensor = torch::eye(3);
     std::cout << tensor << std::endl;
-
-    bool visualization_mesh;
-    if (use_nn==0){
-        visualization_mesh = true;
-    }
-    else{
-        visualization_mesh = false;
-    }
 
     if (visualization_mesh) {
         // Create the visualization mesh and asset
@@ -425,6 +417,19 @@ SCMLoader_Custom::SCMLoader_Custom(ChSystem* system, bool use_nn) : m_sys(system
 
     m_use_nn = use_nn;
 
+    if (m_use_nn){
+        std::cout << "Using NN" << std::endl;
+    }
+    else{
+        std::cout << "Using standard SCM" << std::endl;
+    }
+
+    std::string NN_module_name = "wrapped_gnn_onlydef.pt";
+    std::cout << "Using NN " << NN_module_name << std::endl;
+    
+    Load(vehicle::GetDataFile(m_terrain_dir + NN_module_name));
+    // Create(m_terrain_dir,true);
+
 }
 
 //TODO Deniz - make sure that this function is called always before running the simulation.
@@ -439,60 +444,33 @@ void SCMLoader_Custom::EnterVehicle(std::shared_ptr<WheeledVehicle> vehicle) {
     m_wheels[3] = m_vehicle->GetWheel(1, RIGHT);
 
     // Set default size and offset of sampling box
-    double tire_radius = m_wheels[0]->GetTire()->GetRadius();
-    double tire_width = m_wheels[0]->GetTire()->GetWidth();
-    m_box_size.x() = 0.5;
-    m_box_size.y() = 0.5;
+    tire_radius = m_wheels[0]->GetTire()->GetRadius();
+    tire_width = m_wheels[0]->GetTire()->GetWidth();
+    cout << "Tire radius and width: " << tire_radius << ", " << tire_width << endl;
+    m_box_size.x() = 0.7;
+    m_box_size.y() = 0.7;
     m_box_size.z() = 2.2;
     m_box_offset = ChVector<>(0.0, 0.0, 0.0);
 }
 
-// Pablorewrite
 // Initialize the terrain as a flat grid
 void SCMLoader_Custom::Initialize(double sizeX, double sizeY, double delta) {
     m_type = PatchType::FLAT;
-    
-    // Flag to use NN
-    //m_use_nn = 0;
-    //m_use_nn = 1;
 
-    if (m_use_nn){
+    m_nx = static_cast<int>(std::ceil((sizeX / 2) / delta));  // half number of divisions in X direction
+    m_ny = static_cast<int>(std::ceil((sizeY / 2) / delta));  // number of divisions in Y direction
 
-        m_delta = delta;
-        m_area = std::pow(m_delta, 2);  // area of a cell
-        
-        
-        //std::string NN_module_name = "wrapped_gnn_onlydef_rollout.pt";
-        std::string NN_module_name = "wrapped_gnn_onlydef.pt";
-        //std::string NN_module_name = "wrapped_gnn_onlydef_redwindow.pt";
-        std::cout << "Using NN " << NN_module_name << std::endl;
-        
-        Load(vehicle::GetDataFile(m_terrain_dir + NN_module_name));
-        // Pablo
-        Create(m_terrain_dir,true);
+    m_delta = sizeX / (2 * m_nx);   // grid spacing
+    m_area = std::pow(m_delta, 2);  // area of a cell
 
-    }
-    else{
-        std::cout << "Using standard SCM" << std::endl;
+    // Return now if no visualization
+    if (!m_trimesh_shape)
+        return;
 
-        m_nx = static_cast<int>(std::ceil((sizeX / 2) / delta));  // half number of divisions in X direction
-        m_ny = static_cast<int>(std::ceil((sizeY / 2) / delta));  // number of divisions in Y direction
-
-        m_delta = sizeX / (2 * m_nx);   // grid spacing
-        m_area = std::pow(m_delta, 2);  // area of a cell
-
-        // Return now if no visualization
-        if (!m_trimesh_shape)
-            return;
-
-        CreateVisualizationMesh(sizeX, sizeY);
-        this->AddVisualShape(m_trimesh_shape);
-
-        
-    }
-
-    
+    CreateVisualizationMesh(sizeX, sizeY);
+    this->AddVisualShape(m_trimesh_shape);
 }
+
 
 // Initialize the terrain from a specified height map.
 void SCMLoader_Custom::Initialize(const std::string& heightmap_file,
@@ -1024,6 +1002,10 @@ void SCMLoader_Custom::UpdateFixedPatch(MovingPatchInfo& p) {
     ChVector<> aabb_min;
     ChVector<> aabb_max;
     GetSystem()->GetCollisionSystem()->GetBoundingBox(aabb_min, aabb_max);
+    aabb_min.x()=-4.0;
+    aabb_min.y()=-2.0;
+    aabb_max.x()=4.0;
+    aabb_max.y()=2.0;
 
     // Loop over all corners of the AABB
     for (int j = 0; j < 8; j++) {
@@ -1107,7 +1089,7 @@ static const std::vector<ChVector2<int>> neighbors4{
 
 
 // Reset the list of forces, and fills it with forces from a soil contact model.
-void SCMLoader_Custom::ComputeInternalForcesNN() {
+void SCMLoader_Custom::ComputeInternalForces() {
     // Initialize list of modified visualization mesh vertices (use any externally modified vertices)
     std::vector<int> modified_vertices = m_external_modified_vertices;
     m_external_modified_vertices.clear();
@@ -1200,6 +1182,8 @@ void SCMLoader_Custom::ComputeInternalForcesNN() {
 
     if (m_use_nn){
 
+    Create(m_terrain_dir,true);
+
     // Prepare NN model inputs
     const auto& p_all = m_particles->GetParticles();
     std::vector<torch::jit::IValue> inputs;
@@ -1227,7 +1211,7 @@ void SCMLoader_Custom::ComputeInternalForcesNN() {
 
         // std::cout << w_contactable[i] << ", " << w_pos[i] << ", " << w_rot[i] << w_linvel[i] << std::endl;
 
-        auto tire_radius = m_wheels[i]->GetTire()->GetRadius();
+        //auto tire_radius = m_wheels[i]->GetTire()->GetRadius();
 
         // Sampling OBB
         ChVector<> Z_dir(0, 0, 1);
@@ -1258,8 +1242,12 @@ void SCMLoader_Custom::ComputeInternalForcesNN() {
             *part_pos_data++ = p.x();
             *part_pos_data++ = p.y();
             *part_pos_data++ = p.z();
-            //TODO DENIZ calculate the displacement in the next line better
-            *part_pos_data++ = -p.z();
+            
+            // Get sinkage
+            const ChVector<> loc(p.x(),p.y(),p.z());
+            const auto& initheight=GetInitHeight(loc);
+            //std::cout<<"initheight= "<<initheight<<std::endl;
+            *part_pos_data++ = initheight-p.z();
 
             if (!w_contact[i] && (p - w_pos[i]).Length2() < tire_radius * tire_radius)
                 w_contact[i] = true;
@@ -1322,30 +1310,33 @@ void SCMLoader_Custom::ComputeInternalForcesNN() {
      // For each node around the wheel
      m_particle_positions[i].resize(m_num_particles[i]);
      for (size_t j = 0; j < m_num_particles[i]; j++) {
+
        m_particle_positions[i][j] = ChVector<>(w_out[j][0].item<float>(), w_out[j][1].item<float>(), w_out[j][2].item<float>());
-       ChVector2<int> indexes; 
-       //     //TODO Deniz do this part in a better way   
-       indexes.x() = std::round((m_particle_positions[i][j].x())/m_delta);
-       indexes.y() = std::round((m_particle_positions[i][j].y())/m_delta);
 
-        HitRecord record = {w_contactable[i], m_particle_positions[i][j], i};
-        newhits.insert(std::make_pair(indexes, record));
-       
-       auto p_current = m_wheel_particles[i][j]->GetPos();
-       auto p_new = m_particle_positions[i][j];
-    //    std::cout<<"p_current= "<<p_current<<std::endl;
-    //    std::cout<<"p_new= "<<p_new<<std::endl;
+    //    ChVector2<int> indexes; 
+    //     //     //TODO Deniz do this part in a better way   
+    //     //indexes.x() = std::round((m_particle_positions[i][j].x())/m_delta);
+    //     //indexes.y() = std::round((m_particle_positions[i][j].y())/m_delta);
+    //     indexes.x() = static_cast<int>(std::round((m_particle_positions[i][j].x())/m_delta));
+    //     indexes.y() = static_cast<int>(std::round((m_particle_positions[i][j].y())/m_delta));
 
+    //     HitRecord record = {w_contactable[i], m_particle_positions[i][j], i};
+    //     newhits.insert(std::make_pair(indexes, record));
 
-       m_wheel_particles[i][j]->SetPos(p_new); 
+        if ((m_particle_positions[i][j] - w_pos[i]).Length2() < tire_radius * tire_radius ){
+            ChVector2<int> indexes; 
+            //     //TODO Deniz do this part in a better way   
+            //indexes.x() = std::round((m_particle_positions[i][j].x())/m_delta);
+            //indexes.y() = std::round((m_particle_positions[i][j].y())/m_delta);
+            indexes.x() = static_cast<int>(std::round((m_particle_positions[i][j].x())/m_delta));
+            indexes.y() = static_cast<int>(std::round((m_particle_positions[i][j].y())/m_delta));
 
-
-            // std::cout<<"m_particle_positions[i][j].x()= "<<m_particle_positions[i][j].x()<<std::endl;
-            // std::cout<<"indexes.x()= "<<indexes.x()<<std::endl;
-            // std::cout<<"m_particle_positions[i][j].y()= "<<m_particle_positions[i][j].y()<<std::endl;
-            // std::cout<<"indexes.y()= "<<indexes.y()<<std::endl;    
+            HitRecord record = {w_contactable[i], m_particle_positions[i][j], i};
+            newhits.insert(std::make_pair(indexes, record));
         }
-    } 
+       
+        }
+    }
 
     // Sequential insertion in global hits
     for (auto& h : newhits) {
@@ -1765,7 +1756,7 @@ void SCMLoader_Custom::ComputeInternalForcesNN() {
 
     // Pablodebug
     //cout << "Mean force: " << meanforce/(float)forcecounts << ", " << sigma_mean/(float)forcecounts << ", " << tau_mean/(float)forcecounts << endl;
-    cout << "Mean force: " << meanforce << endl;
+    cout << "Mean force per wheel: " << meanforce/4. << endl;
 
     m_timer_contact_forces.stop();
 
@@ -2114,35 +2105,26 @@ bool SCMLoader_Custom::Load(const std::string& pt_file) {
 
 // Pablo
 void SCMLoader_Custom::Create(const std::string& terrain_dir, bool vis) {
+
     m_particles = chrono_types::make_shared<ChParticleCloud>();
     m_particles->SetFixed(true);
-
     int num_particles = 0;
-    ChVector<> marker;
-    std::string line;
-    std::string cell;
 
-    std::ifstream is(vehicle::GetDataFile(terrain_dir + "/vertices_0.txt"));
-    getline(is, line);  // Comment line
-    while (getline(is, line)) {
-        std::stringstream ls(line);
-        for (int i = 0; i < 3; i++) {
-            getline(ls, cell, ',');
-            marker[i] = stod(cell);
-            
+    // std::cout<<"SCMLoader_Custom::Create"<<std::endl;
+    // std::cout<<"m_patches.size()= "<<m_patches.size()<<std::endl;
+    for (auto& p : m_patches) {
+        for (int k = 0; k < p.m_range.size(); k++) {
+            ChVector2<int> ij = p.m_range[k];
+            // Move from (i, j) to (x, y, z) representation in the world frame
+            double x = ij.x() * m_delta;
+            double y = ij.y() * m_delta;
+            double z = GetHeight(ij);
+            m_particles->AddParticle(ChCoordsys<>(ChVector<>(x, y, z)));
+            num_particles++;
         }
-        m_particles->AddParticle(ChCoordsys<>(marker));
-        num_particles++;
+        }
 
-        if (num_particles > 1000000)
-            break;
-    }
-    is.close();
-
-    std::cout<<"num_particles= "<<num_particles<<std::endl;
-
-
-    m_sys->Add(m_particles);
+    // m_sys->Add(m_particles);
 
     if (vis) {
         auto sph = chrono_types::make_shared<ChSphereShape>();
@@ -2150,11 +2132,9 @@ void SCMLoader_Custom::Create(const std::string& terrain_dir, bool vis) {
         m_particles->AddVisualShape(sph);
     }
 
-
     // Initial size of sampling box particle vectors
     for (int i = 0; i < 4; i++)
         m_wheel_particles[i].resize(num_particles);
-
 }
 
 
