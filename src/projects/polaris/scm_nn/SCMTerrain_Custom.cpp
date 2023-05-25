@@ -1002,10 +1002,10 @@ void SCMLoader_Custom::UpdateFixedPatch(MovingPatchInfo& p) {
     ChVector<> aabb_min;
     ChVector<> aabb_max;
     GetSystem()->GetCollisionSystem()->GetBoundingBox(aabb_min, aabb_max);
-    aabb_min.x()=-4.0;
-    aabb_min.y()=-2.0;
-    aabb_max.x()=4.0;
-    aabb_max.y()=2.0;
+    aabb_min.x()-=0.1;
+    aabb_min.y()-=0.1;
+    aabb_max.x()+=0.1;
+    aabb_max.y()+=0.1;
 
     // Loop over all corners of the AABB
     for (int j = 0; j < 8; j++) {

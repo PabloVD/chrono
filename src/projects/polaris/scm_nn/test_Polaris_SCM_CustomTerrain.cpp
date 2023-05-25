@@ -284,8 +284,8 @@ int main(int argc, char* argv[]) {
     //ChCoordsys<> init_pos(ChVector<>(1.3, 0, 0.1), QUNIT);
 
     // First find height in the spawn point to ensure that the vehicle spawns above the floor
-    //double init_x = 4.-terrainLength/2.0;
-    double init_x = 0.;
+    double init_x = 4.-terrainLength/2.0;
+    //double init_x = 0.;
     ChVector<> initLoc0(init_x, 0, initheight);
     double terrainheightspawn = terrain.GetHeight(initLoc0);
     // cout << "Height terrain in spawn point: " << terrainheightspawn << endl;
