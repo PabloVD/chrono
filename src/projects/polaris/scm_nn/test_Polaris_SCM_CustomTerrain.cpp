@@ -32,7 +32,8 @@
 #include "chrono_vehicle/ChDriver.h"
 #include "SCMTerrain_Custom.h"
 #include "chrono_vehicle/terrain/RigidTerrain.h"
-#include "chrono_vehicle/wheeled_vehicle/utils/ChWheeledVehicleVisualSystemIrrlicht.h"
+//#include "chrono_vehicle/wheeled_vehicle/utils/ChWheeledVehicleVisualSystemIrrlicht.h"
+#include "chrono_vehicle/wheeled_vehicle/ChWheeledVehicleVisualSystemIrrlicht.h"
 
 #include "chrono_models/vehicle/hmmwv/HMMWV.h"
 
@@ -77,8 +78,10 @@ double tend = 0.5;
 
 // double terrainLength = 8.0;  // size in X direction
 // double terrainWidth = 3.0;    // size in Y direction
-double terrainLength = 35.0;  // size in X direction
-double terrainWidth = 17.5;    // size in Y direction
+double terrainLength = 20.0;  // size in X direction
+double terrainWidth = 4.0;    // size in Y direction
+// double terrainLength = 35.0;  // size in X direction
+// double terrainWidth = 17.5;    // size in Y direction
 double delta = 0.05;          // SCM grid spacing
 
 double throttlemagnitude=0.;
@@ -91,6 +94,9 @@ double maxheight = 1.5*35.0/40.0;
 // Flag for using NN
 //bool use_nn = 1;
 bool use_nn = 0;
+
+// Flag for printing time stats
+bool print_stats = 1;
 
 // -----------------------------------------------------------------------------
 // Simulation parameters
@@ -412,7 +418,9 @@ int main(int argc, char* argv[]) {
         step_number++;
 
         // Pablo
-        //terrain.PrintStepStatistics(cout);
+        if (print_stats){
+            terrain.PrintStepStatistics(cout);
+        }
     }
 
     return 0;

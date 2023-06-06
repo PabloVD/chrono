@@ -299,6 +299,8 @@ class CH_VEHICLE_API SCMTerrain_Custom : public SCMTerrain {
     double GetTimerRayCasting() const;
     /// Return time for computing contact patches at last step (ms).
     double GetTimerContactPatches() const;
+    /// Return time for neural network computation (ms).
+    double GetTimerNN() const;
     /// Return time for computing contact forces at last step (ms).
     double GetTimerContactForces() const;
     /// Return time for computing bulldozing effects at last step (ms).
@@ -602,6 +604,7 @@ class CH_VEHICLE_API SCMLoader_Custom : public ChLoadContainer {
     ChTimer m_timer_ray_testing;
     ChTimer m_timer_ray_casting;
     ChTimer m_timer_contact_patches;
+    ChTimer m_timer_nn;
     ChTimer m_timer_contact_forces;
     ChTimer m_timer_bulldozing;
     ChTimer m_timer_bulldozing_boundary;

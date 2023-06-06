@@ -193,6 +193,9 @@ double SCMTerrain_Custom::GetTimerRayCasting() const {
 double SCMTerrain_Custom::GetTimerContactPatches() const {
     return 1e3 * m_loader->m_timer_contact_patches();
 }
+double SCMTerrain_Custom::GetTimerNN() const {
+    return 1e3 * m_loader->m_timer_nn();
+}
 double SCMTerrain_Custom::GetTimerContactForces() const {
     return 1e3 * m_loader->m_timer_contact_forces();
 }
@@ -210,6 +213,7 @@ void SCMTerrain_Custom::PrintStepStatistics(std::ostream& os) const {
     os << "   Ray testing:             " << 1e3 * m_loader->m_timer_ray_testing() << std::endl;
     os << "   Ray casting:             " << 1e3 * m_loader->m_timer_ray_casting() << std::endl;
     os << "   Contact patches:         " << 1e3 * m_loader->m_timer_contact_patches() << std::endl;
+    os << "   Neural Network:          " << 1e3 * m_loader->m_timer_nn() << std::endl;
     os << "   Contact forces:          " << 1e3 * m_loader->m_timer_contact_forces() << std::endl;
     os << "   Bulldozing:              " << 1e3 * m_loader->m_timer_bulldozing() << std::endl;
     os << "      Raise boundary:       " << 1e3 * m_loader->m_timer_bulldozing_boundary() << std::endl;
@@ -424,7 +428,8 @@ SCMLoader_Custom::SCMLoader_Custom(ChSystem* system, bool visualization_mesh, bo
         std::cout << "Using standard SCM" << std::endl;
     }
 
-    std::string NN_module_name = "wrapped_gnn_onlydef.pt";
+    //std::string NN_module_name = "wrapped_gnn_onlydef.pt";
+    std::string NN_module_name = "wrapped_gnn_onlydef_cuda.pt";
     std::cout << "Using NN " << NN_module_name << std::endl;
     
     Load(vehicle::GetDataFile(m_terrain_dir + NN_module_name));
@@ -1119,6 +1124,7 @@ void SCMLoader_Custom::ComputeInternalForces() {
     m_timer_ray_testing.reset();
     m_timer_ray_casting.reset();
     m_timer_contact_patches.reset();
+    m_timer_nn.reset();
     m_timer_contact_forces.reset();
     m_timer_bulldozing.reset();
     m_timer_bulldozing_boundary.reset();
@@ -1181,6 +1187,8 @@ void SCMLoader_Custom::ComputeInternalForces() {
     // ---------------------
 
     if (m_use_nn){
+
+    m_timer_nn.start();
 
     Create(m_terrain_dir,true);
 
@@ -1249,7 +1257,7 @@ void SCMLoader_Custom::ComputeInternalForces() {
             //std::cout<<"initheight= "<<initheight<<std::endl;
             *part_pos_data++ = initheight-p.z();
 
-            if (!w_contact[i] && (p - w_pos[i]).Length2() < tire_radius * tire_radius)
+            if (!w_contact[i] && (p - w_pos[i]).Length2() < tire_radius * tire_radius * 1.4)
                 w_contact[i] = true;
         }
 
@@ -1323,7 +1331,7 @@ void SCMLoader_Custom::ComputeInternalForces() {
     //     HitRecord record = {w_contactable[i], m_particle_positions[i][j], i};
     //     newhits.insert(std::make_pair(indexes, record));
 
-        if ((m_particle_positions[i][j] - w_pos[i]).Length2() < tire_radius * tire_radius ){
+        if ((m_particle_positions[i][j] - w_pos[i]).Length2() < tire_radius * tire_radius * 1.4 ){
             ChVector2<int> indexes; 
             //     //TODO Deniz do this part in a better way   
             //indexes.x() = std::round((m_particle_positions[i][j].x())/m_delta);
@@ -1346,6 +1354,8 @@ void SCMLoader_Custom::ComputeInternalForces() {
             m_grid_map.insert(std::make_pair(h.first, NodeRecord(z, z, GetInitNormal(h.first))));
         }
     }
+
+    m_timer_nn.stop();
 
     }
 
