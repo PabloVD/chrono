@@ -78,8 +78,8 @@ double tend = 0.5;
 
 // double terrainLength = 8.0;  // size in X direction
 // double terrainWidth = 3.0;    // size in Y direction
-double terrainLength = 20.0;  // size in X direction
-double terrainWidth = 4.0;    // size in Y direction
+double terrainLength = 100.0;  // size in X direction
+double terrainWidth = 15.0;    // size in Y direction
 // double terrainLength = 35.0;  // size in X direction
 // double terrainWidth = 17.5;    // size in Y direction
 double delta = 0.05;          // SCM grid spacing
@@ -418,9 +418,9 @@ int main(int argc, char* argv[]) {
         step_number++;
 
         // Pablo
-        if (print_stats){
-            terrain.PrintStepStatistics(cout);
-        }
+        // if (print_stats){
+        //     terrain.PrintStepStatistics(cout);
+        // }
     }
 
     return 0;

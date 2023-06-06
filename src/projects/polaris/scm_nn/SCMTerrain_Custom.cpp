@@ -428,8 +428,7 @@ SCMLoader_Custom::SCMLoader_Custom(ChSystem* system, bool visualization_mesh, bo
         std::cout << "Using standard SCM" << std::endl;
     }
 
-    //std::string NN_module_name = "wrapped_gnn_onlydef.pt";
-    std::string NN_module_name = "wrapped_gnn_onlydef_cuda.pt";
+    std::string NN_module_name = "wrapped_unet_cpu.pt";
     std::cout << "Using NN " << NN_module_name << std::endl;
     
     Load(vehicle::GetDataFile(m_terrain_dir + NN_module_name));
@@ -452,8 +451,8 @@ void SCMLoader_Custom::EnterVehicle(std::shared_ptr<WheeledVehicle> vehicle) {
     tire_radius = m_wheels[0]->GetTire()->GetRadius();
     tire_width = m_wheels[0]->GetTire()->GetWidth();
     cout << "Tire radius and width: " << tire_radius << ", " << tire_width << endl;
-    m_box_size.x() = 0.7;
-    m_box_size.y() = 0.7;
+    m_box_size.x() = 1.1;
+    m_box_size.y() = 1.1;
     m_box_size.z() = 2.2;
     m_box_offset = ChVector<>(0.0, 0.0, 0.0);
 }
@@ -1007,10 +1006,10 @@ void SCMLoader_Custom::UpdateFixedPatch(MovingPatchInfo& p) {
     ChVector<> aabb_min;
     ChVector<> aabb_max;
     GetSystem()->GetCollisionSystem()->GetBoundingBox(aabb_min, aabb_max);
-    aabb_min.x()-=0.1;
-    aabb_min.y()-=0.1;
-    aabb_max.x()+=0.1;
-    aabb_max.y()+=0.1;
+    aabb_min.x()-=0.35;
+    aabb_min.y()-=0.35;
+    aabb_max.x()+=0.35;
+    aabb_max.y()+=0.35;
 
     // Loop over all corners of the AABB
     for (int j = 0; j < 8; j++) {
@@ -1317,9 +1316,20 @@ void SCMLoader_Custom::ComputeInternalForces() {
 
      // For each node around the wheel
      m_particle_positions[i].resize(m_num_particles[i]);
-     for (size_t j = 0; j < m_num_particles[i]; j++) {
+     //for (size_t j = 0; j < m_num_particles[i]; j++) {
+    for (size_t j = 0; j < 16*16; j++) {
 
-       m_particle_positions[i][j] = ChVector<>(w_out[j][0].item<float>(), w_out[j][1].item<float>(), w_out[j][2].item<float>());
+        float pos_x = w_out[j][0].item<float>();
+        float pos_y = w_out[j][1].item<float>();
+        float def_z = w_out[j][2].item<float>();
+
+        ChVector2<int> indexes; 
+        indexes.x() = static_cast<int>(std::round(pos_x/m_delta));
+        indexes.y() = static_cast<int>(std::round(pos_y/m_delta));
+
+        float pos_z = GetHeight(indexes);
+
+        m_particle_positions[i][j] = ChVector<>(pos_x, pos_y, pos_z + def_z);
 
     //    ChVector2<int> indexes; 
     //     //     //TODO Deniz do this part in a better way   
@@ -1332,13 +1342,7 @@ void SCMLoader_Custom::ComputeInternalForces() {
     //     newhits.insert(std::make_pair(indexes, record));
 
         if ((m_particle_positions[i][j] - w_pos[i]).Length2() < tire_radius * tire_radius * 1.4 ){
-            ChVector2<int> indexes; 
-            //     //TODO Deniz do this part in a better way   
-            //indexes.x() = std::round((m_particle_positions[i][j].x())/m_delta);
-            //indexes.y() = std::round((m_particle_positions[i][j].y())/m_delta);
-            indexes.x() = static_cast<int>(std::round((m_particle_positions[i][j].x())/m_delta));
-            indexes.y() = static_cast<int>(std::round((m_particle_positions[i][j].y())/m_delta));
-
+            
             HitRecord record = {w_contactable[i], m_particle_positions[i][j], i};
             newhits.insert(std::make_pair(indexes, record));
         }
