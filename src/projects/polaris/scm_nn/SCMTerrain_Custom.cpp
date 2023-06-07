@@ -378,7 +378,7 @@ SCMLoader_Custom::SCMLoader_Custom(ChSystem* system, bool visualization_mesh, bo
     this->SetSystem(system);
 
     std::cout << "Inside SCMLoader_Custom" << std::endl;
-    std::cout << "cuda version " << scatter::cuda_version() << std::endl;
+    // std::cout << "cuda version " << scatter::cuda_version() << std::endl;
     torch::Tensor tensor = torch::eye(3);
     std::cout << tensor << std::endl;
 
@@ -428,7 +428,7 @@ SCMLoader_Custom::SCMLoader_Custom(ChSystem* system, bool visualization_mesh, bo
         std::cout << "Using standard SCM" << std::endl;
     }
 
-    std::string NN_module_name = "wrapped_unet_cpu.pt";
+    std::string NN_module_name = "wrapped_unet_cuda.pt";
     std::cout << "Using NN " << NN_module_name << std::endl;
     
     Load(vehicle::GetDataFile(m_terrain_dir + NN_module_name));
@@ -455,6 +455,7 @@ void SCMLoader_Custom::EnterVehicle(std::shared_ptr<WheeledVehicle> vehicle) {
     m_box_size.y() = 1.1;
     m_box_size.z() = 2.2;
     m_box_offset = ChVector<>(0.0, 0.0, 0.0);
+    margin_factor = 1.4;
 }
 
 // Initialize the terrain as a flat grid
@@ -1256,7 +1257,7 @@ void SCMLoader_Custom::ComputeInternalForces() {
             //std::cout<<"initheight= "<<initheight<<std::endl;
             *part_pos_data++ = initheight-p.z();
 
-            if (!w_contact[i] && (p - w_pos[i]).Length2() < tire_radius * tire_radius * 1.4)
+            if (!w_contact[i] && (p - w_pos[i]).Length2() < tire_radius * tire_radius * margin_factor)
                 w_contact[i] = true;
         }
 
@@ -1341,7 +1342,7 @@ void SCMLoader_Custom::ComputeInternalForces() {
     //     HitRecord record = {w_contactable[i], m_particle_positions[i][j], i};
     //     newhits.insert(std::make_pair(indexes, record));
 
-        if ((m_particle_positions[i][j] - w_pos[i]).Length2() < tire_radius * tire_radius * 1.4 ){
+        if ((m_particle_positions[i][j] - w_pos[i]).Length2() < tire_radius * tire_radius * margin_factor ){
             
             HitRecord record = {w_contactable[i], m_particle_positions[i][j], i};
             newhits.insert(std::make_pair(indexes, record));
@@ -2097,7 +2098,7 @@ void SCMLoader_Custom::SetModifiedNodes(const std::vector<SCMTerrain_Custom::Nod
 
 
 bool SCMLoader_Custom::Load(const std::string& pt_file) {
-    std::cout << "cuda version " << scatter::cuda_version() << std::endl;
+    //std::cout << "cuda version " << torch::cuda_version() << std::endl;
     torch::Tensor tensor = torch::eye(3);
     std::cout << tensor << std::endl;
 

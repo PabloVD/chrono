@@ -54,8 +54,8 @@ using std::endl;
 
 #include <torch/torch.h>
 #include <torch/script.h>
-#include <torchscatter/scatter.h>
-#include <torchcluster/cluster.h>
+// #include <torchscatter/scatter.h>
+// #include <torchcluster/cluster.h>
 // torch::jit::script::Module module;
 
 // torch::Tensor tensor = torch::eye(3);
@@ -78,10 +78,12 @@ double tend = 0.5;
 
 // double terrainLength = 8.0;  // size in X direction
 // double terrainWidth = 3.0;    // size in Y direction
-double terrainLength = 100.0;  // size in X direction
-double terrainWidth = 15.0;    // size in Y direction
+// double terrainLength = 100.0;  // size in X direction
+// double terrainWidth = 15.0;    // size in Y direction
 // double terrainLength = 35.0;  // size in X direction
 // double terrainWidth = 17.5;    // size in Y direction
+double terrainLength = 70.0;  // size in X direction
+double terrainWidth = 10.0;    // size in Y direction
 double delta = 0.05;          // SCM grid spacing
 
 double throttlemagnitude=0.;
@@ -117,7 +119,7 @@ const std::string out_dir = GetChronoOutputPath() + "POLARIS_SCM";
 const std::string img_dir = out_dir + "/IMG";
 
 // Visualization output
-bool img_output = false;
+bool img_output = true;
 
 // Vertices output
 bool ver_output = true;
@@ -243,8 +245,8 @@ int main(int argc, char* argv[]) {
                                 30,    // Mohr friction limit (degrees)
                                 0.01,  // Janosi shear coefficient (m)
                                 2e8,   // Elastic stiffness (Pa/m), before plastic yield
-                                //0       // Damping (Pa s/m), proportional to negative vertical speed (optional)
-                                3e4    // Damping (Pa s/m), proportional to negative vertical speed (optional)
+                                0       // Damping (Pa s/m), proportional to negative vertical speed (optional)
+                                //3e4    // Damping (Pa s/m), proportional to negative vertical speed (optional)
     );
 
     ////terrain.EnableBulldozing(true);      // inflate soil at the border of the rut

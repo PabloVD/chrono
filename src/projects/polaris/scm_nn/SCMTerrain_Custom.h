@@ -39,8 +39,8 @@
 
 #include <torch/torch.h>
 #include <torch/script.h>
-#include <torchscatter/scatter.h>
-#include <torchcluster/cluster.h>
+// #include <torchscatter/scatter.h>
+// #include <torchcluster/cluster.h>
 
 
 // Pablo
@@ -634,6 +634,7 @@ class CH_VEHICLE_API SCMLoader_Custom : public ChLoadContainer {
     bool m_verbose;
     double tire_radius;
     double tire_width;
+    double margin_factor;
 
     // Pablo, hardcoded
     std::string m_terrain_dir = "terrain/scm/";
