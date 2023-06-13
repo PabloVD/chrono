@@ -213,7 +213,9 @@ void SCMTerrain_Custom::PrintStepStatistics(std::ostream& os) const {
     os << "   Ray testing:             " << 1e3 * m_loader->m_timer_ray_testing() << std::endl;
     os << "   Ray casting:             " << 1e3 * m_loader->m_timer_ray_casting() << std::endl;
     os << "   Contact patches:         " << 1e3 * m_loader->m_timer_contact_patches() << std::endl;
+    os << "   Preprocess NN:           " << 1e3 * m_loader->m_timer_preprocess() << std::endl;
     os << "   Neural Network:          " << 1e3 * m_loader->m_timer_nn() << std::endl;
+    os << "   Postprocess NN:          " << 1e3 * m_loader->m_timer_postprocess() << std::endl;
     os << "   Contact forces:          " << 1e3 * m_loader->m_timer_contact_forces() << std::endl;
     os << "   Bulldozing:              " << 1e3 * m_loader->m_timer_bulldozing() << std::endl;
     os << "      Raise boundary:       " << 1e3 * m_loader->m_timer_bulldozing_boundary() << std::endl;
@@ -428,7 +430,8 @@ SCMLoader_Custom::SCMLoader_Custom(ChSystem* system, bool visualization_mesh, bo
         std::cout << "Using standard SCM" << std::endl;
     }
 
-    std::string NN_module_name = "wrapped_unet_cuda.pt";
+    std::string NN_module_name = "wrapped_unet_cpu.pt";
+    //std::string NN_module_name = "wrapped_unet_cuda.pt";
     std::cout << "Using NN " << NN_module_name << std::endl;
     
     Load(vehicle::GetDataFile(m_terrain_dir + NN_module_name));
@@ -1124,7 +1127,9 @@ void SCMLoader_Custom::ComputeInternalForces() {
     m_timer_ray_testing.reset();
     m_timer_ray_casting.reset();
     m_timer_contact_patches.reset();
+    m_timer_preprocess.reset();
     m_timer_nn.reset();
+    m_timer_postprocess.reset();
     m_timer_contact_forces.reset();
     m_timer_bulldozing.reset();
     m_timer_bulldozing_boundary.reset();
@@ -1188,9 +1193,11 @@ void SCMLoader_Custom::ComputeInternalForces() {
 
     if (m_use_nn){
 
-    m_timer_nn.start();
+    m_timer_preprocess.start();
 
     Create(m_terrain_dir,true);
+
+    m_timer_preprocess.stop();
 
     // Prepare NN model inputs
     const auto& p_all = m_particles->GetParticles();
@@ -1296,6 +1303,10 @@ void SCMLoader_Custom::ComputeInternalForces() {
     m_verbose=true;
     inputs.push_back(m_verbose);
 
+    //m_timer_preprocess.stop();
+
+    m_timer_nn.start();
+
     // //m_timer_model_eval.start();
     torch::jit::IValue outputs;
     try {
@@ -1307,6 +1318,10 @@ void SCMLoader_Custom::ComputeInternalForces() {
         std::cerr << "Execute error other: " << e.what() << std::endl;
         return;
     }
+
+    m_timer_nn.stop();
+
+    m_timer_postprocess.start();
 
     cout << "Numparts: " << m_num_particles[0] + m_num_particles[1] + m_num_particles[2] + m_num_particles[3] << endl;
    
@@ -1360,7 +1375,7 @@ void SCMLoader_Custom::ComputeInternalForces() {
         }
     }
 
-    m_timer_nn.stop();
+    m_timer_postprocess.stop();
 
     }
 

@@ -78,12 +78,12 @@ double tend = 0.5;
 
 // double terrainLength = 8.0;  // size in X direction
 // double terrainWidth = 3.0;    // size in Y direction
-// double terrainLength = 100.0;  // size in X direction
-// double terrainWidth = 15.0;    // size in Y direction
+double terrainLength = 30.0;  // size in X direction
+double terrainWidth = 3.0;    // size in Y direction
 // double terrainLength = 35.0;  // size in X direction
 // double terrainWidth = 17.5;    // size in Y direction
-double terrainLength = 70.0;  // size in X direction
-double terrainWidth = 10.0;    // size in Y direction
+// double terrainLength = 70.0;  // size in X direction
+// double terrainWidth = 10.0;    // size in Y direction
 double delta = 0.05;          // SCM grid spacing
 
 double throttlemagnitude=0.;
@@ -113,10 +113,6 @@ double render_step_size=step_size;
 
 // Point on chassis tracked by the camera
 ChVector<> trackPoint(0.0, 0.0, 1.75);
-
-// Output directories
-const std::string out_dir = GetChronoOutputPath() + "POLARIS_SCM";
-const std::string img_dir = out_dir + "/IMG";
 
 // Visualization output
 bool img_output = true;
@@ -219,6 +215,10 @@ int main(int argc, char* argv[]) {
     bool verbose = true;
     bool wheel_output = true;      // save individual wheel output files
     double output_major_fps = 1.0/render_step_size;
+
+    // Output directories
+    const std::string out_dir = GetChronoOutputPath() + "POLARIS_SCM_throttle_"+ std::to_string(throttlemagnitude);
+    const std::string img_dir = out_dir + "/IMG";
 
 
     // --------------------
@@ -420,9 +420,9 @@ int main(int argc, char* argv[]) {
         step_number++;
 
         // Pablo
-        // if (print_stats){
-        //     terrain.PrintStepStatistics(cout);
-        // }
+        if (print_stats){
+            terrain.PrintStepStatistics(cout);
+        }
     }
 
     return 0;

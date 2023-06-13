@@ -604,7 +604,9 @@ class CH_VEHICLE_API SCMLoader_Custom : public ChLoadContainer {
     ChTimer m_timer_ray_testing;
     ChTimer m_timer_ray_casting;
     ChTimer m_timer_contact_patches;
+    ChTimer m_timer_preprocess;
     ChTimer m_timer_nn;
+    ChTimer m_timer_postprocess;
     ChTimer m_timer_contact_forces;
     ChTimer m_timer_bulldozing;
     ChTimer m_timer_bulldozing_boundary;
