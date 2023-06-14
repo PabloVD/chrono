@@ -78,10 +78,10 @@ double tend = 0.5;
 
 // double terrainLength = 8.0;  // size in X direction
 // double terrainWidth = 3.0;    // size in Y direction
-double terrainLength = 30.0;  // size in X direction
-double terrainWidth = 3.0;    // size in Y direction
-// double terrainLength = 35.0;  // size in X direction
-// double terrainWidth = 17.5;    // size in Y direction
+// double terrainLength = 30.0;  // size in X direction
+// double terrainWidth = 3.0;    // size in Y direction
+double terrainLength = 35.0;  // size in X direction
+double terrainWidth = 17.5;    // size in Y direction
 // double terrainLength = 70.0;  // size in X direction
 // double terrainWidth = 10.0;    // size in Y direction
 double delta = 0.05;          // SCM grid spacing
@@ -97,9 +97,6 @@ double maxheight = 1.5*35.0/40.0;
 //bool use_nn = 1;
 bool use_nn = 0;
 
-// Flag for printing time stats
-bool print_stats = 1;
-
 // -----------------------------------------------------------------------------
 // Simulation parameters
 // -----------------------------------------------------------------------------
@@ -113,6 +110,9 @@ double render_step_size=step_size;
 
 // Point on chassis tracked by the camera
 ChVector<> trackPoint(0.0, 0.0, 1.75);
+
+// Flag for printing time stats
+bool print_stats = 1;
 
 // Visualization output
 bool img_output = true;

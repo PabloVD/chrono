@@ -1195,12 +1195,12 @@ void SCMLoader_Custom::ComputeInternalForces() {
 
     m_timer_preprocess.start();
 
-    Create(m_terrain_dir,true);
+    // Create(m_terrain_dir,true);
 
-    m_timer_preprocess.stop();
+    
 
     // Prepare NN model inputs
-    const auto& p_all = m_particles->GetParticles();
+    // const auto& p_all = m_particles->GetParticles();
     std::vector<torch::jit::IValue> inputs;
     
     std::array<ChVector<float>, 4> w_pos;
@@ -1210,6 +1210,7 @@ void SCMLoader_Custom::ComputeInternalForces() {
     std::array<ChVector<float>, 4> w_angvel;
     std::array<bool, 4> w_contact;
     std::array<ChContactable*, 4> w_contactable;
+    std::array<ChVector2<int>, 4> w_startindex;
 
     // Loop over all vehicle wheels
     for (int i = 0; i < 4; i++) {
@@ -1217,6 +1218,8 @@ void SCMLoader_Custom::ComputeInternalForces() {
         // Wheel state
         const auto& w_state = m_wheels[i]->GetState();
         w_pos[i] = w_state.pos;
+        w_startindex[i].x() = static_cast<int>(std::round(w_pos[i].x()/m_delta))-8;
+        w_startindex[i].y() = static_cast<int>(std::round(w_pos[i].y()/m_delta))-8;
         w_rot[i] = w_state.rot;
         w_nrm[i] = w_state.rot.GetYaxis();
         w_linvel[i] = w_state.lin_vel;
@@ -1235,12 +1238,12 @@ void SCMLoader_Custom::ComputeInternalForces() {
         ChMatrix33<> box_rot(X_dir, Y_dir, Z_dir);
         ChVector<> box_pos = w_pos[i] + box_rot * (m_box_offset - ChVector<>(0, 0, tire_radius));
 
-        // Find particles in sampling OBB
-        m_wheel_particles[i].resize(p_all.size());
-        auto end = std::copy_if(p_all.begin(), p_all.end(), m_wheel_particles[i].begin(),
-                                in_box(box_pos, box_rot, m_box_size));
-        m_num_particles[i] = (size_t)(end - m_wheel_particles[i].begin());
-        m_wheel_particles[i].resize(m_num_particles[i]);
+        // // Find particles in sampling OBB
+        // m_wheel_particles[i].resize(p_all.size());
+        // auto end = std::copy_if(p_all.begin(), p_all.end(), m_wheel_particles[i].begin(),
+        //                         in_box(box_pos, box_rot, m_box_size));
+        // m_num_particles[i] = (size_t)(end - m_wheel_particles[i].begin());
+        // m_wheel_particles[i].resize(m_num_particles[i]);
 
         // Do nothing if no particles under a wheel
         // if (m_num_particles[i] == 0) {
@@ -1250,23 +1253,36 @@ void SCMLoader_Custom::ComputeInternalForces() {
         // Torch part
         // Load particle positions and velocities
         w_contact[i] = false;
-        auto part_pos = torch::empty({(int)m_num_particles[i], 4}, torch::kFloat32);
+        auto part_pos = torch::empty({(int)(16*16), 4}, torch::kFloat32);
         float* part_pos_data = part_pos.data<float>();
-        for (const auto& part : m_wheel_particles[i]) {
-            ChVector<float> p(part->GetPos());
-            *part_pos_data++ = p.x();
-            *part_pos_data++ = p.y();
-            *part_pos_data++ = p.z();
+        for (int k=w_startindex[i].x();k<w_startindex[i].x()+16;k++)
+        {
+          for (int l=w_startindex[i].y();l<w_startindex[i].y()+16;l++)  
+          {
+
+            double x = k * m_delta;
+            double y = l * m_delta;
+            ChVector2<int> ij; 
+            ij.x() = k;
+            ij.y() = l;
+            double z = GetHeight(ij);
+
+
+            *part_pos_data++ = x;
+            *part_pos_data++ = y;
+            *part_pos_data++ = z;
             
             // Get sinkage
-            const ChVector<> loc(p.x(),p.y(),p.z());
+            const ChVector<> loc(x,y,z);
             const auto& initheight=GetInitHeight(loc);
             //std::cout<<"initheight= "<<initheight<<std::endl;
-            *part_pos_data++ = initheight-p.z();
+            *part_pos_data++ = initheight-z;
 
-            if (!w_contact[i] && (p - w_pos[i]).Length2() < tire_radius * tire_radius * margin_factor)
-                w_contact[i] = true;
+            // if (!w_contact[i] && (p - w_pos[i]).Length2() < tire_radius * tire_radius * margin_factor)
+            //     w_contact[i] = true;
+          }
         }
+            // std::cout << "part_pos.size()= "<< part_pos.size() << std::endl;
 
         // Load wheel position, orientation, linear velocity, and angular velocity
         auto w_pos_t = torch::from_blob((void*)w_pos[i].data(), {3}, torch::kFloat32);
@@ -1297,13 +1313,13 @@ void SCMLoader_Custom::ComputeInternalForces() {
         //std::cout << " num. particles: " << m_num_particles[i] << std::endl;
     }
 
-    std::cout << " Tot Num. particles: " << m_num_particles[0] +m_num_particles[1]+m_num_particles[2]+m_num_particles[3] << std::endl;
+    // std::cout << " Tot Num. particles: " << m_num_particles[0] +m_num_particles[1]+m_num_particles[2]+m_num_particles[3] << std::endl;
 
     // Verbose flag
     m_verbose=true;
     inputs.push_back(m_verbose);
 
-    //m_timer_preprocess.stop();
+    m_timer_preprocess.stop();
 
     m_timer_nn.start();
 
@@ -1323,7 +1339,7 @@ void SCMLoader_Custom::ComputeInternalForces() {
 
     m_timer_postprocess.start();
 
-    cout << "Numparts: " << m_num_particles[0] + m_num_particles[1] + m_num_particles[2] + m_num_particles[3] << endl;
+    // cout << "Numparts: " << m_num_particles[0] + m_num_particles[1] + m_num_particles[2] + m_num_particles[3] << endl;
    
     // Loop over all vehicle wheels
     for (int i = 0; i < 4; i++) {
@@ -1331,7 +1347,8 @@ void SCMLoader_Custom::ComputeInternalForces() {
      const auto& w_out = outputs.toTuple()->elements()[i].toTensor();
 
      // For each node around the wheel
-     m_particle_positions[i].resize(m_num_particles[i]);
+    //  m_particle_positions[i].resize(m_num_particles[i]);
+     m_particle_positions[i].resize(16*16);
      //for (size_t j = 0; j < m_num_particles[i]; j++) {
     for (size_t j = 0; j < 16*16; j++) {
 
