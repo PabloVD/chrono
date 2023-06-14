@@ -217,7 +217,24 @@ int main(int argc, char* argv[]) {
     double output_major_fps = 1.0/render_step_size;
 
     // Output directories
-    const std::string out_dir = GetChronoOutputPath() + "POLARIS_SCM_throttle_"+ std::to_string(throttlemagnitude);
+    std::string out_dir = GetChronoOutputPath() + "POLARIS_SCM";
+    
+    if (use_nn){
+        out_dir +=  "_nn";
+    }
+    else{
+        out_dir += "_scm";
+    }
+    if (heightmapterrain){
+        out_dir +=  "_hmap";
+    }
+    else{
+        out_dir +=  "_flat";
+    }
+    std::stringstream str_throttle, str_steering;
+    str_throttle << std::fixed << std::setprecision(2) << throttlemagnitude;
+    str_steering << std::fixed << std::setprecision(2) << steeringmagnitude;
+    out_dir += "_throttle_"+str_throttle.str()+"_steering_"+str_steering.str();
     const std::string img_dir = out_dir + "/IMG";
 
 
