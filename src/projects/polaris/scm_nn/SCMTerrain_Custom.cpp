@@ -430,7 +430,7 @@ SCMLoader_Custom::SCMLoader_Custom(ChSystem* system, bool visualization_mesh, bo
         std::cout << "Using standard SCM" << std::endl;
     }
 
-    //std::string NN_module_name = "wrapped_unet_cpu.pt";
+    // std::string NN_module_name = "wrapped_unet_cpu.pt";
     std::string NN_module_name = "wrapped_unet_cuda.pt";
     std::cout << "Using NN " << NN_module_name << std::endl;
     
@@ -1342,7 +1342,11 @@ void SCMLoader_Custom::ComputeInternalForces() {
     // cout << "Numparts: " << m_num_particles[0] + m_num_particles[1] + m_num_particles[2] + m_num_particles[3] << endl;
    
     // Loop over all vehicle wheels
+    int nthreads = GetSystem()->GetNumThreadsChrono();
+    std::vector<std::unordered_map<ChVector2<int>, HitRecord, CoordHash>> t_hits(nthreads);
+    #pragma omp parallel for num_threads(nthreads)
     for (int i = 0; i < 4; i++) {
+     int t_num = ChOMP::GetThreadNum();
      // Test for newhits
      const auto& w_out = outputs.toTuple()->elements()[i].toTensor();
 
@@ -1377,20 +1381,25 @@ void SCMLoader_Custom::ComputeInternalForces() {
         if ((m_particle_positions[i][j] - w_pos[i]).Length2() < tire_radius * tire_radius * margin_factor ){
             
             HitRecord record = {w_contactable[i], m_particle_positions[i][j], i};
-            newhits.insert(std::make_pair(indexes, record));
+            // newhits.insert(std::make_pair(indexes, record));
+            t_hits[t_num].insert(std::make_pair(indexes, record));
         }
        
         }
     }
 
     // Sequential insertion in global hits
-    for (auto& h : newhits) {
-        // If this is the first hit from this node, initialize the node record
-        if (m_grid_map.find(h.first) == m_grid_map.end()) {
-            double z = GetInitHeight(h.first);
-            m_grid_map.insert(std::make_pair(h.first, NodeRecord(z, z, GetInitNormal(h.first))));
+        for (int t_num = 0; t_num < nthreads; t_num++) {
+            for (auto& h : t_hits[t_num]) {
+                // If this is the first hit from this node, initialize the node record
+                if (m_grid_map.find(h.first) == m_grid_map.end()) {
+                    double z = GetInitHeight(h.first);
+                    m_grid_map.insert(std::make_pair(h.first, NodeRecord(z, z, GetInitNormal(h.first))));
+                }
+            }
+            newhits.insert(t_hits[t_num].begin(), t_hits[t_num].end());
+            t_hits[t_num].clear();
         }
-    }
 
     m_timer_postprocess.stop();
 
