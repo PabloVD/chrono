@@ -4,7 +4,8 @@
 #
 #=============================================================================
 
-add_compile_definitions(_GLIBCXX_USE_CXX11_ABI=0)
+set(CMAKE_CUDA_COMPILER "/usr/local/cuda/bin/nvcc")
+#add_compile_definitions(_GLIBCXX_USE_CXX11_ABI=0)
 
 #-----------------------------------------------------------------------------
 # Optionally enable building the various programs
@@ -338,11 +339,11 @@ if(CUDA_FOUND)
   elseif(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
     set(CUDA_PROPAGATE_HOST_FLAGS OFF)
     if(${CH_CXX14})
-      		set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} -std c++14")
-      		set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} -Xcompiler -std=c++14")
+              set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS}" "-std" "c++14")
+              set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS}" "-Xcompiler" "-std=c++14")
     else()
-      		set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} -std c++11")
-      		set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} -Xcompiler -std=c++11")
+              set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} -std c++11")
+              set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} -Xcompiler -std=c++11")
     endif()
     set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS}; --compiler-options -fPIC)
   elseif(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")

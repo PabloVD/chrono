@@ -430,8 +430,8 @@ SCMLoader_Custom::SCMLoader_Custom(ChSystem* system, bool visualization_mesh, bo
         std::cout << "Using standard SCM" << std::endl;
     }
 
-    std::string NN_module_name = "wrapped_unet_cpu.pt";
-    //std::string NN_module_name = "wrapped_unet_cuda.pt";
+    //std::string NN_module_name = "wrapped_unet_cpu.pt";
+    std::string NN_module_name = "wrapped_unet_cuda.pt";
     std::cout << "Using NN " << NN_module_name << std::endl;
     
     Load(vehicle::GetDataFile(m_terrain_dir + NN_module_name));
