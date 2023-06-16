@@ -433,6 +433,8 @@ SCMLoader_Custom::SCMLoader_Custom(ChSystem* system, bool visualization_mesh, bo
     // std::string NN_module_name = "wrapped_unet_cpu.pt";
     std::string NN_module_name = "wrapped_unet_cuda.pt";
     std::cout << "Using NN " << NN_module_name << std::endl;
+    // gridsize = 16;
+    gridsize = 12;
     
     Load(vehicle::GetDataFile(m_terrain_dir + NN_module_name));
     // Create(m_terrain_dir,true);
@@ -1218,8 +1220,8 @@ void SCMLoader_Custom::ComputeInternalForces() {
         // Wheel state
         const auto& w_state = m_wheels[i]->GetState();
         w_pos[i] = w_state.pos;
-        w_startindex[i].x() = static_cast<int>(std::round(w_pos[i].x()/m_delta))-8;
-        w_startindex[i].y() = static_cast<int>(std::round(w_pos[i].y()/m_delta))-8;
+        w_startindex[i].x() = static_cast<int>(std::round(w_pos[i].x()/m_delta))-gridsize/2;
+        w_startindex[i].y() = static_cast<int>(std::round(w_pos[i].y()/m_delta))-gridsize/2;
         w_rot[i] = w_state.rot;
         w_nrm[i] = w_state.rot.GetYaxis();
         w_linvel[i] = w_state.lin_vel;
@@ -1253,11 +1255,11 @@ void SCMLoader_Custom::ComputeInternalForces() {
         // Torch part
         // Load particle positions and velocities
         w_contact[i] = false;
-        auto part_pos = torch::empty({(int)(16*16), 4}, torch::kFloat32);
+        auto part_pos = torch::empty({(int)(gridsize*gridsize), 4}, torch::kFloat32);
         float* part_pos_data = part_pos.data<float>();
-        for (int k=w_startindex[i].x();k<w_startindex[i].x()+16;k++)
+        for (int k=w_startindex[i].x();k<w_startindex[i].x()+gridsize;k++)
         {
-          for (int l=w_startindex[i].y();l<w_startindex[i].y()+16;l++)  
+          for (int l=w_startindex[i].y();l<w_startindex[i].y()+gridsize;l++)  
           {
 
             double x = k * m_delta;
@@ -1343,6 +1345,7 @@ void SCMLoader_Custom::ComputeInternalForces() {
    
     // Loop over all vehicle wheels
     int nthreads = GetSystem()->GetNumThreadsChrono();
+    nthreads = 1;
     std::vector<std::unordered_map<ChVector2<int>, HitRecord, CoordHash>> t_hits(nthreads);
     #pragma omp parallel for num_threads(nthreads)
     for (int i = 0; i < 4; i++) {
@@ -1352,9 +1355,9 @@ void SCMLoader_Custom::ComputeInternalForces() {
 
      // For each node around the wheel
     //  m_particle_positions[i].resize(m_num_particles[i]);
-     m_particle_positions[i].resize(16*16);
+     m_particle_positions[i].resize(gridsize*gridsize);
      //for (size_t j = 0; j < m_num_particles[i]; j++) {
-    for (size_t j = 0; j < 16*16; j++) {
+    for (size_t j = 0; j < gridsize*gridsize; j++) {
 
         float pos_x = w_out[j][0].item<float>();
         float pos_y = w_out[j][1].item<float>();
