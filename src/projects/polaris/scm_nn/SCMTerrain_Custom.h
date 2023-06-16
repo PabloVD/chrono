@@ -637,6 +637,7 @@ class CH_VEHICLE_API SCMLoader_Custom : public ChLoadContainer {
     double tire_radius;
     double tire_width;
     double margin_factor;
+    int gridsize;
 
     // Pablo, hardcoded
     std::string m_terrain_dir = "terrain/scm/";
