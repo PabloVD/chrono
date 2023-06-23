@@ -63,7 +63,7 @@ using std::endl;
 
 bool GetProblemSpecs(int argc,
                      char** argv,
-                     std::string& terrain_dir, double& tend, double& throttlemagnitude, double& steeringmagnitude, double& render_step_size, bool& heightmapterrain, double& initheight, bool& use_nn);
+                     std::string& terrain_dir, double& tend, double& throttle, double& steering, double& render_step_size, bool& heightmapterrain, double& initheight, bool& use_nn);
 
 // =============================================================================
 // USER SETTINGS
@@ -82,12 +82,14 @@ double tend = 0.5;
 // double terrainWidth = 3.0;    // size in Y direction
 double terrainLength = 35.0;  // size in X direction
 double terrainWidth = 17.5;    // size in Y direction
+// double terrainLength = 100.0;  // size in X direction
+// double terrainWidth = 6.0;    // size in Y direction
 // double terrainLength = 70.0;  // size in X direction
 // double terrainWidth = 10.0;    // size in Y direction
 double delta = 0.05;          // SCM grid spacing
 
-double throttlemagnitude=0.;
-double steeringmagnitude=0.;
+double throttle=0.;
+double steering=0.;
 bool heightmapterrain=true;
 double initheight=0.1;
 //double maxheight = 0.5;
@@ -112,7 +114,7 @@ double render_step_size=step_size;
 ChVector<> trackPoint(0.0, 0.0, 1.75);
 
 // Flag for printing time stats
-bool print_stats = true;
+bool print_stats = false;
 
 // Visualization output
 bool img_output = true;
@@ -125,14 +127,14 @@ bool ver_output = true;
 
 bool GetProblemSpecs(int argc,
                      char** argv,
-                     std::string& terrain_dir, double& tend, double& throttlemagnitude, double& steeringmagnitude, double& render_step_size, bool& heightmapterrain, double& initheight, bool& use_nn) 
+                     std::string& terrain_dir, double& tend, double& throttle, double& steering, double& render_step_size, bool& heightmapterrain, double& initheight, bool& use_nn) 
     {
     ChCLI cli(argv[0], "Polaris SCM terrain simulation");
 
     cli.AddOption<std::string>("Problem setup", "terrain_dir", "Directory with terrain specification data");
     cli.AddOption<double>("Simulation", "tend", "Simulation end time [s]", std::to_string(tend));
-    cli.AddOption<double>("Simulation", "throttlemagnitude", "Simulation throttle magnitude ", std::to_string(throttlemagnitude));
-    cli.AddOption<double>("Simulation", "steeringmagnitude", "Simulation steering magnitude ", std::to_string(steeringmagnitude));
+    cli.AddOption<double>("Simulation", "throttle", "Simulation throttle magnitude ", std::to_string(throttle));
+    cli.AddOption<double>("Simulation", "steering", "Simulation steering magnitude ", std::to_string(steering));
     cli.AddOption<double>("Simulation", "render_step_size", "Simulation render and output step size ", std::to_string(render_step_size));
     cli.AddOption<double>("Simulation", "initheight", "Spawning height in meters ", std::to_string(initheight));
     cli.AddOption<bool>("Simulation", "use_nn", "Use NN for true or standard SCM for false", std::to_string(use_nn));
@@ -150,8 +152,8 @@ bool GetProblemSpecs(int argc,
         // return false;
     }
     tend = cli.GetAsType<double>("tend");
-    throttlemagnitude = cli.GetAsType<double>("throttlemagnitude");
-    steeringmagnitude = cli.GetAsType<double>("steeringmagnitude");
+    throttle = cli.GetAsType<double>("throttle");
+    steering = cli.GetAsType<double>("steering");
     render_step_size = cli.GetAsType<double>("render_step_size");
     initheight = cli.GetAsType<double>("initheight");
     use_nn = cli.GetAsType<bool>("use_nn");
@@ -178,10 +180,10 @@ class MyDriver : public ChDriver {
 
         if (eff_time > 0.0)
         { 
-            //m_throttle = throttlemagnitude;
-            m_throttle = throttlemagnitude * (std::sin(CH_C_2PI * (eff_time) / 2.) + 1.5);
+            //m_throttle = throttle;
+            m_throttle = throttle * (std::sin(CH_C_2PI * (eff_time) / 2.) + 1.5);
             m_braking = 0.0;
-            m_steering = steeringmagnitude * std::sin(CH_C_2PI * (eff_time) / 4.);
+            m_steering = steering * std::sin(CH_C_2PI * (eff_time) / 4.);
         }
         
         if (m_throttle > 1.)
@@ -202,7 +204,7 @@ int main(int argc, char* argv[]) {
     GetLog() << "Copyright (c) 2017 projectchrono.org\nChrono version: " << CHRONO_VERSION << "\n\n";
     
     if (!GetProblemSpecs(argc, argv,                                 
-                         terrain_dir, tend, throttlemagnitude, steeringmagnitude, render_step_size, heightmapterrain, initheight, use_nn)) 
+                         terrain_dir, tend, throttle, steering, render_step_size, heightmapterrain, initheight, use_nn)) 
     {
         return 1;
     }
@@ -226,15 +228,25 @@ int main(int argc, char* argv[]) {
         out_dir += "_scm";
     }
     if (heightmapterrain){
-        out_dir +=  "_hmap";
+
+        std::string hmapstring = "hmap_";
+        
+        int found_in = terrain_dir.find(hmapstring)  + hmapstring.length();
+        int found_end = terrain_dir.find(".png");
+        std::string hmap_num = terrain_dir.substr(found_in, found_end-found_in);
+        out_dir += "_" + hmapstring + hmap_num;
     }
     else{
         out_dir +=  "_flat";
     }
-    std::stringstream str_throttle, str_steering;
-    str_throttle << std::fixed << std::setprecision(2) << throttlemagnitude;
-    str_steering << std::fixed << std::setprecision(2) << steeringmagnitude;
+    std::stringstream str_throttle, str_steering, str_initheight, str_tend;
+    str_throttle << std::fixed << std::setprecision(2) << throttle;
+    str_steering << std::fixed << std::setprecision(2) << steering;
+    str_initheight << std::fixed << std::setprecision(2) << initheight;
+    str_tend << std::fixed << std::setprecision(2) << tend;
     out_dir += "_throttle_"+str_throttle.str()+"_steering_"+str_steering.str();
+    out_dir += "_initheight_"+str_initheight.str();
+    out_dir += "_tend_"+str_tend.str();
     const std::string img_dir = out_dir + "/IMG";
 
 

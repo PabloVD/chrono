@@ -460,7 +460,8 @@ void SCMLoader_Custom::EnterVehicle(std::shared_ptr<WheeledVehicle> vehicle) {
     m_box_size.y() = 1.1;
     m_box_size.z() = 2.2;
     m_box_offset = ChVector<>(0.0, 0.0, 0.0);
-    margin_factor = 1.4;
+    //margin_factor = 1.;  // 1 when tire_radius * tire_radius * margin_factor
+    margin_factor = 0.0;
 }
 
 // Initialize the terrain as a flat grid
@@ -1353,15 +1354,21 @@ void SCMLoader_Custom::ComputeInternalForces() {
      // Test for newhits
      const auto& w_out = outputs.toTuple()->elements()[i].toTensor();
 
+
      // For each node around the wheel
     //  m_particle_positions[i].resize(m_num_particles[i]);
-     m_particle_positions[i].resize(gridsize*gridsize);
+     //m_particle_positions[i].resize(gridsize*gridsize);
      //for (size_t j = 0; j < m_num_particles[i]; j++) {
-    for (size_t j = 0; j < gridsize*gridsize; j++) {
+    //for (size_t j = 0; j < gridsize*gridsize; j++) {
+    //for (size_t j = 0; j < 82; j++) {
+    for (size_t j = 0; j < w_out.sizes()[0]; j++) {
 
         float pos_x = w_out[j][0].item<float>();
         float pos_y = w_out[j][1].item<float>();
         float def_z = w_out[j][2].item<float>();
+        // float pos_x = wpart[0].item<float>();
+        // float pos_y = wpart[1].item<float>();
+        // float def_z = wpart[2].item<float>();
 
         ChVector2<int> indexes; 
         indexes.x() = static_cast<int>(std::round(pos_x/m_delta));
@@ -1369,7 +1376,8 @@ void SCMLoader_Custom::ComputeInternalForces() {
 
         float pos_z = GetHeight(indexes);
 
-        m_particle_positions[i][j] = ChVector<>(pos_x, pos_y, pos_z + def_z);
+        //m_particle_positions[i][j] = ChVector<>(pos_x, pos_y, pos_z + def_z);
+        ChVector<> new_part_pos = ChVector<>(pos_x, pos_y, pos_z + def_z);
 
     //    ChVector2<int> indexes; 
     //     //     //TODO Deniz do this part in a better way   
@@ -1381,9 +1389,17 @@ void SCMLoader_Custom::ComputeInternalForces() {
     //     HitRecord record = {w_contactable[i], m_particle_positions[i][j], i};
     //     newhits.insert(std::make_pair(indexes, record));
 
-        if ((m_particle_positions[i][j] - w_pos[i]).Length2() < tire_radius * tire_radius * margin_factor ){
+
+        // HitRecord record = {w_contactable[i], new_part_pos, i};
+        // // newhits.insert(std::make_pair(indexes, record));
+        // t_hits[t_num].insert(std::make_pair(indexes, record));
+
             
-            HitRecord record = {w_contactable[i], m_particle_positions[i][j], i};
+
+        //if ((new_part_pos - w_pos[i]).Length2() <  tire_radius * tire_radius * margin_factor ){
+        if ((new_part_pos - w_pos[i]).Length2() <  std::pow(tire_radius + margin_factor, 2) ){
+            
+            HitRecord record = {w_contactable[i], new_part_pos, i};
             // newhits.insert(std::make_pair(indexes, record));
             t_hits[t_num].insert(std::make_pair(indexes, record));
         }
@@ -1661,7 +1677,13 @@ void SCMLoader_Custom::ComputeInternalForces() {
         newhits = hits;
     }
     int numnewhits = (int)newhits.size();
-    std::cout << "Num newhits: " << numnewhits << std::endl;
+    //std::cout << "Num newhits: " << numnewhits << std::endl;
+
+    int numhits[4]={0,0,0,0}; 
+    std::array<ChVector<float>, 4> wheel_force;
+    for (int i=0; i<4; i++){
+        wheel_force[i] = ChVector<>(0,0,0);
+    }
 
 
     // Process only hit nodes
@@ -1675,6 +1697,8 @@ void SCMLoader_Custom::ComputeInternalForces() {
         ChContactable* contactable = h.second.contactable;
         const ChVector<>& hit_point_abs = h.second.abs_point;
         int patch_id = h.second.patch_id;
+        
+        numhits[patch_id]++;
 
         auto hit_point_loc = m_plane.TransformPointParentToLocal(hit_point_abs);
 
@@ -1766,6 +1790,7 @@ void SCMLoader_Custom::ComputeInternalForces() {
         // Pablodebug
         ChVector<> forcetest = Fn + Ft;
         meanforce += forcetest;
+        wheel_force[patch_id] += forcetest;
         sigma_mean += nr.sigma;
         tau_mean += nr.tau;
         forcecounts++;
@@ -1815,7 +1840,9 @@ void SCMLoader_Custom::ComputeInternalForces() {
 
     // Pablodebug
     //cout << "Mean force: " << meanforce/(float)forcecounts << ", " << sigma_mean/(float)forcecounts << ", " << tau_mean/(float)forcecounts << endl;
-    cout << "Mean force per wheel: " << meanforce/4. << endl;
+    //cout << "Mean force per wheel: " << meanforce/4. << endl;
+    cout << "Force per wheel: " << wheel_force[0] << "  " << wheel_force[1] << "  " << wheel_force[2] << "  " << wheel_force[3] << endl;
+    cout << "Num hits per wheel: " << numhits[0] << "  " << numhits[1] << "  " << numhits[2] << "  " << numhits[3] << endl;
 
     m_timer_contact_forces.stop();
 
