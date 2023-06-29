@@ -40,6 +40,7 @@ endif()
 set(PROGRAMS 
     test_Polaris_SCM
     test_Polaris_SCM_CustomTerrain
+    test_Polaris_SCM_Rocks
     )
     
 set(UTILITIES

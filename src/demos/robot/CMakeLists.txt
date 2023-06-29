@@ -10,7 +10,8 @@ endif()
 
 set(DEMOS
     demo_ROBOT_Curiosity_Rigid
-    demo_ROBOT_Curiosity_SCM    
+    demo_ROBOT_Curiosity_SCM
+    demo_ROBOT_Curiosity_SCM_mod    
     demo_ROBOT_Turtlebot_Rigid
     demo_ROBOT_Viper_Rigid
     demo_ROBOT_Viper_SCM

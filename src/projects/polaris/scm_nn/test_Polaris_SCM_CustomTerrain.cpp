@@ -78,7 +78,7 @@ double tend = 0.5;
 
 // double terrainLength = 8.0;  // size in X direction
 // double terrainWidth = 3.0;    // size in Y direction
-// double terrainLength = 30.0;  // size in X direction
+// double terrainLength = 15.0;  // size in X direction
 // double terrainWidth = 3.0;    // size in Y direction
 double terrainLength = 35.0;  // size in X direction
 double terrainWidth = 17.5;    // size in Y direction
@@ -94,6 +94,7 @@ bool heightmapterrain=true;
 double initheight=0.1;
 //double maxheight = 0.5;
 double maxheight = 1.5*35.0/40.0;
+//double maxheight = 3.;
 
 // Flag for using NN
 //bool use_nn = 1;
@@ -114,7 +115,7 @@ double render_step_size=step_size;
 ChVector<> trackPoint(0.0, 0.0, 1.75);
 
 // Flag for printing time stats
-bool print_stats = false;
+bool print_stats = true;
 
 // Visualization output
 bool img_output = true;
@@ -394,7 +395,9 @@ int main(int argc, char* argv[]) {
     int step_number = 0;
     int render_frame = 0;
     double t = 0;
-    while (t < tend) {
+    //while (t < tend) {
+    while (vis->Run()) {
+    
 
         // const auto& veh_loc = vehicle->GetPos();
         // std::cout<<"veh_loc ="<<veh_loc<<std::endl;
@@ -452,6 +455,9 @@ int main(int argc, char* argv[]) {
         if (print_stats){
             terrain.PrintStepStatistics(cout);
         }
+
+        if (t>=tend)
+            break;
     }
 
     return 0;
