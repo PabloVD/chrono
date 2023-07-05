@@ -32,7 +32,9 @@
 #include "chrono_vehicle/ChDriver.h"
 #include "chrono_vehicle/terrain/SCMTerrain.h"
 #include "chrono_vehicle/terrain/RigidTerrain.h"
-#include "chrono_vehicle/wheeled_vehicle/utils/ChWheeledVehicleVisualSystemIrrlicht.h"
+//#include "chrono_vehicle/wheeled_vehicle/utils/ChWheeledVehicleVisualSystemIrrlicht.h"
+#include "chrono_vehicle/wheeled_vehicle/ChWheeledVehicleVisualSystemIrrlicht.h"
+
 
 #include "chrono_models/vehicle/hmmwv/HMMWV.h"
 
