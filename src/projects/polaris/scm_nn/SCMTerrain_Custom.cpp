@@ -216,6 +216,7 @@ void SCMTerrain_Custom::PrintStepStatistics(std::ostream& os) const {
     os << "   Preprocess NN:           " << 1e3 * m_loader->m_timer_preprocess() << std::endl;
     os << "   Neural Network:          " << 1e3 * m_loader->m_timer_nn() << std::endl;
     os << "   Postprocess NN:          " << 1e3 * m_loader->m_timer_postprocess() << std::endl;
+    os << "   Postprocess NN (global hits):          " << 1e3 * m_loader->m_timer_postprocess2() << std::endl;
     os << "   Contact forces:          " << 1e3 * m_loader->m_timer_contact_forces() << std::endl;
     os << "   Bulldozing:              " << 1e3 * m_loader->m_timer_bulldozing() << std::endl;
     os << "      Raise boundary:       " << 1e3 * m_loader->m_timer_bulldozing_boundary() << std::endl;
@@ -319,19 +320,45 @@ void SCMTerrain_Custom::RegisterSoilParametersCallback(std::shared_ptr<SoilParam
 }
 
 // Save the vertices of the visualization mesh as a csv file.
+void SCMTerrain_Custom::WriteModifiedMeshVertices(const std::string& filename) const{
+    std::ofstream mf(filename);
+    mf <<"#index,z"<< std::endl;
+    std::vector<SCMTerrain_Custom::NodeLevel> nodes=m_loader->GetModifiedNodes(false);
+    int v_counter = 0;
+    for (auto& node:nodes)
+    {   
+        auto ij = node.first;
+        int iv = m_loader->GetMeshVertexIndex(ij);          // mesh vertex index
+        double x = ij.x() * m_loader->m_delta;
+        double y = ij.y() * m_loader->m_delta;
+        auto z = node.second;
+        mf << iv << ", " << z << std::endl;
+        v_counter++;
+        
+    }
+    mf.close();
+}
+
+// Save the vertices of the visualization mesh as a csv file.
 void SCMTerrain_Custom::WriteMeshVertices(const std::string& filename) const{
     if (!m_loader->m_trimesh_shape) {
         std::cout << "SCMTerrain::WriteMeshVertices  -- visualization mesh not created.";
         return;
     }
     std::ofstream mf(filename);
-    mf <<"#x,y,z"<< std::endl;
+    //mf <<"#x,y,z"<< std::endl;
+    mf <<"#index,x,y,z"<< std::endl;
     auto trimesh = m_loader->m_trimesh_shape->GetMesh();
     std::vector<geometry::ChTriangleMeshConnected> meshes = {*trimesh};
     int v_counter = 0;
     for (auto& m : meshes) {
         for (auto& v : m.m_vertices) {
-            mf << v.x() << ", " << v.y() << ", " << v.z() << std::endl;
+            ChVector2<int> ij; 
+            ij.x() = static_cast<int>(std::round(v.x()/m_loader->m_delta));
+            ij.y() = static_cast<int>(std::round(v.y()/m_loader->m_delta));
+            int iv = m_loader->GetMeshVertexIndex(ij);          // mesh vertex index
+            mf << iv << ", " << v.x() << ", " << v.y() << ", " << v.z() << std::endl;
+            //mf << v.x() << ", " << v.y() << ", " << v.z() << std::endl;
             v_counter++;
         }
     }
@@ -1133,6 +1160,7 @@ void SCMLoader_Custom::ComputeInternalForces() {
     m_timer_preprocess.reset();
     m_timer_nn.reset();
     m_timer_postprocess.reset();
+    m_timer_postprocess2.reset();
     m_timer_contact_forces.reset();
     m_timer_bulldozing.reset();
     m_timer_bulldozing_boundary.reset();
@@ -1346,9 +1374,10 @@ void SCMLoader_Custom::ComputeInternalForces() {
    
     // Loop over all vehicle wheels
     int nthreads = GetSystem()->GetNumThreadsChrono();
-    nthreads = 1;
+    //nthreads = 4;
     std::vector<std::unordered_map<ChVector2<int>, HitRecord, CoordHash>> t_hits(nthreads);
     #pragma omp parallel for num_threads(nthreads)
+    //#pragma omp parallel for num_threads(nthreads) collapse(6)
     for (int i = 0; i < 4; i++) {
      int t_num = ChOMP::GetThreadNum();
      // Test for newhits
@@ -1361,6 +1390,8 @@ void SCMLoader_Custom::ComputeInternalForces() {
      //for (size_t j = 0; j < m_num_particles[i]; j++) {
     //for (size_t j = 0; j < gridsize*gridsize; j++) {
     //for (size_t j = 0; j < 82; j++) {
+    // int nthreads2 = GetSystem()->GetNumThreadsChrono()-4;
+    // #pragma omp parallel for num_threads(nthreads2)
     for (size_t j = 0; j < w_out.sizes()[0]; j++) {
 
         float pos_x = w_out[j][0].item<float>();
@@ -1407,6 +1438,9 @@ void SCMLoader_Custom::ComputeInternalForces() {
         }
     }
 
+    m_timer_postprocess.stop();
+    m_timer_postprocess2.start();
+
     // Sequential insertion in global hits
         for (int t_num = 0; t_num < nthreads; t_num++) {
             for (auto& h : t_hits[t_num]) {
@@ -1420,7 +1454,7 @@ void SCMLoader_Custom::ComputeInternalForces() {
             t_hits[t_num].clear();
         }
 
-    m_timer_postprocess.stop();
+    m_timer_postprocess2.stop();
 
     }
 

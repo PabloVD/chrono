@@ -118,10 +118,10 @@ ChVector<> trackPoint(0.0, 0.0, 1.75);
 bool print_stats = true;
 
 // Visualization output
-bool img_output = true;
+bool img_output = false;
 
 // Vertices output
-bool ver_output = true;
+bool ver_output = false;
 
 // =============================================================================
 
@@ -347,7 +347,7 @@ int main(int argc, char* argv[]) {
     // Create the vehicle Irrlicht application
     // ---------------------------------------
     auto vis = chrono_types::make_shared<ChWheeledVehicleVisualSystemIrrlicht>();
-    vis->SetWindowTitle("HMMWV Deformable Soil Demo");
+    vis->SetWindowTitle("Polaris SCM");
     vis->SetChaseCamera(trackPoint, 6.0, 0.5);
     vis->Initialize();
     vis->AddLightDirectional();
@@ -396,7 +396,19 @@ int main(int argc, char* argv[]) {
     int render_frame = 0;
     double t = 0;
     //while (t < tend) {
+
+
+    ChTimer timer_tot, timer_sync, timer_vis, timer_advance;
+    
+
     while (vis->Run()) {
+
+        timer_sync.reset();
+        timer_vis.reset();
+        timer_advance.reset();
+        timer_tot.reset();
+
+        timer_tot.start();
     
 
         // const auto& veh_loc = vehicle->GetPos();
@@ -405,6 +417,8 @@ int main(int argc, char* argv[]) {
         // if (veh_loc.x() > x_max || veh_loc.y() > y_max )
         //     break;
 
+        timer_vis.start();
+
         // Render scene
         vis->Run();
         vis->BeginScene();
@@ -412,26 +426,36 @@ int main(int argc, char* argv[]) {
         tools::drawColorbar(vis.get(), 0, 0.1, "Sinkage", 30);
         vis->EndScene();
 
+        timer_vis.stop();
+
         if (ver_output)
-            data_writer.Process(step_number, t); 
+            data_writer.Process(step_number, t);
         
         if (step_number % render_steps == 0) {
             if (ver_output)
             {   
             std::string vertices_filename = out_dir +  "/vertices_" + std::to_string(render_frame) + ".csv";
             if (step_number==0)
-             terrain.WriteMeshVertices(vertices_filename);
-            else
-             terrain.WriteMeshVerticesinz(vertices_filename);
-            }
-            if (img_output% render_steps == 0)
             {
-            char filename[100];
-            sprintf(filename, "%s/img_%03d.jpg", img_dir.c_str(), render_frame + 1);
+             terrain.WriteMeshVertices(vertices_filename);
+            }
+            else
+            {
+             //terrain.WriteMeshVerticesinz(vertices_filename);
+             terrain.WriteModifiedMeshVertices(vertices_filename);
+            }
+            }
+            if (img_output)
+            {
+            //char filename[100];
+            //sprintf(filename, "%s/img_%03d.jpg", img_dir.c_str(), render_frame + 1);
+            std::string  filename = img_dir + "/img_"+ std::to_string(render_frame) +".jpg";
             vis->WriteImageToFile(filename);
             }
             render_frame++;
         }
+
+        timer_sync.start();
 
         // // Driver inputs
         DriverInputs driver_inputs = driver.GetInputs();
@@ -443,10 +467,16 @@ int main(int argc, char* argv[]) {
         vehicle->Synchronize(t, driver_inputs, terrain);
         vis->Synchronize(t, driver_inputs);
 
+        timer_sync.stop();
+        timer_advance.start();
+
         // Advance dynamics
         sys.DoStepDynamics(step_size);
         vis->Advance(step_size);
         t += step_size;
+
+        timer_advance.stop();
+        timer_tot.stop();
 
         // Increment frame number
         step_number++;
@@ -454,6 +484,11 @@ int main(int argc, char* argv[]) {
         // Pablo
         if (print_stats){
             terrain.PrintStepStatistics(cout);
+            std::cout << "Visualization time by step (ms): " << 1e3 * timer_vis() << std::endl;
+            std::cout << "Synchronization time by step (ms): " << 1e3 * timer_sync() << std::endl;
+            std::cout << "Advance time by step (ms): " << 1e3 * timer_advance() << std::endl;
+            std::cout << "Total time by step (ms): " << 1e3 * timer_tot() << std::endl;
+            
         }
 
         if (t>=tend)

@@ -92,7 +92,7 @@ bool print_stats = true;
 bool output = false;
 const std::string out_dir = GetChronoOutputPath() + "CURIOSITY_SCM";
 
-bool use_rocks = false;
+bool use_rocks = true;
 
 // -----------------------------------------------------------------------------
 

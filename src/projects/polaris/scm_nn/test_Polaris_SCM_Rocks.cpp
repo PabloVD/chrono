@@ -83,7 +83,7 @@ double tend = 0.5;
 
 // double terrainLength = 8.0;  // size in X direction
 // double terrainWidth = 3.0;    // size in Y direction
-double terrainLength = 15.0;  // size in X direction
+double terrainLength = 35.0;  // size in X direction
 double terrainWidth = 4.0;    // size in Y direction
 // double terrainLength = 35.0;  // size in X direction
 // double terrainWidth = 17.5;    // size in Y direction
@@ -123,10 +123,10 @@ ChVector<> trackPoint(0.0, 0.0, 1.75);
 bool print_stats = true;
 
 // Visualization output
-bool img_output = true;
+bool img_output = false;
 
 // Vertices output
-bool ver_output = true;
+bool ver_output = false;
 
 bool use_rocks = true;
 
@@ -303,7 +303,7 @@ int main(int argc, char* argv[]) {
     for (int i = 0; i < 6; i++) {
         //std::cout << "Reading from " << GetChronoDataFile(rock_meshfile[i]) << std::endl;
         auto mesh = ChTriangleMeshConnected::CreateFromWavefrontFile(GetChronoDataFile(rock_meshfile[i]), false, true);
-        mesh->Transform(ChVector<>(0, 0, 0), ChMatrix33<>(0.5*rock_scale[i]));
+        mesh->Transform(ChVector<>(0, 0, 0), ChMatrix33<>(rock_scale[i]));
         mesh->Transform(ChVector<>(0, 0, 0), Q_from_AngX(-CH_C_PI_2));
         
 
@@ -481,7 +481,19 @@ int main(int argc, char* argv[]) {
     int render_frame = 0;
     double t = 0;
     //while (t < tend) {
+
+
+    ChTimer timer_tot, timer_sync, timer_vis, timer_advance;
+    
+
     while (vis->Run()) {
+
+        timer_sync.reset();
+        timer_vis.reset();
+        timer_advance.reset();
+        timer_tot.reset();
+
+        timer_tot.start();
     
 
         // const auto& veh_loc = vehicle->GetPos();
@@ -490,12 +502,16 @@ int main(int argc, char* argv[]) {
         // if (veh_loc.x() > x_max || veh_loc.y() > y_max )
         //     break;
 
+        timer_vis.start();
+
         // Render scene
         vis->Run();
         vis->BeginScene();
         vis->Render();
         tools::drawColorbar(vis.get(), 0, 0.1, "Sinkage", 30);
         vis->EndScene();
+
+        timer_vis.stop();
 
         if (ver_output)
             data_writer.Process(step_number, t); 
@@ -505,18 +521,26 @@ int main(int argc, char* argv[]) {
             {   
             std::string vertices_filename = out_dir +  "/vertices_" + std::to_string(render_frame) + ".csv";
             if (step_number==0)
-             terrain.WriteMeshVertices(vertices_filename);
-            else
-             terrain.WriteMeshVerticesinz(vertices_filename);
-            }
-            if (img_output% render_steps == 0)
             {
-            char filename[100];
-            sprintf(filename, "%s/img_%03d.jpg", img_dir.c_str(), render_frame + 1);
+             terrain.WriteMeshVertices(vertices_filename);
+            }
+            else
+            {
+             //terrain.WriteMeshVerticesinz(vertices_filename);
+             terrain.WriteModifiedMeshVertices(vertices_filename);
+            }
+            }
+            if (img_output)
+            {
+            // char filename[100];
+            // sprintf(filename, "%s/img_%03d.jpg", img_dir.c_str(), render_frame + 1);
+            std::string  filename = img_dir + "/img_"+ std::to_string(render_frame) +".jpg";
             vis->WriteImageToFile(filename);
             }
             render_frame++;
         }
+
+        timer_sync.start();
 
         // // Driver inputs
         DriverInputs driver_inputs = driver.GetInputs();
@@ -528,10 +552,15 @@ int main(int argc, char* argv[]) {
         vehicle->Synchronize(t, driver_inputs, terrain);
         vis->Synchronize(t, driver_inputs);
 
+        timer_sync.stop();
+        timer_advance.start();
+
         // Advance dynamics
         sys.DoStepDynamics(step_size);
         vis->Advance(step_size);
         t += step_size;
+
+        timer_advance.stop();
 
         // Increment frame number
         step_number++;
@@ -539,6 +568,12 @@ int main(int argc, char* argv[]) {
         // Pablo
         if (print_stats){
             terrain.PrintStepStatistics(cout);
+            timer_tot.stop();
+            std::cout << "Visualization time by step (ms): " << 1e3 * timer_vis() << std::endl;
+            std::cout << "Synchronization time by step (ms): " << 1e3 * timer_sync() << std::endl;
+            std::cout << "Advance time by step (ms): " << 1e3 * timer_advance() << std::endl;
+            std::cout << "Total time by step (ms): " << 1e3 * timer_tot() << std::endl;
+            
         }
 
         if (t>=tend)

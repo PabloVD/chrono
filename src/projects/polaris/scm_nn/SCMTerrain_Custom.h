@@ -313,6 +313,9 @@ class CH_VEHICLE_API SCMTerrain_Custom : public SCMTerrain {
 
     std::shared_ptr<SCMLoader_Custom> GetSCMLoader() const { return m_loader; }
 
+    // Save the vertices of the visualization mesh as a csv file.
+    void WriteModifiedMeshVertices(const std::string& filename) const;
+
     /// Save the vertices of the visualization mesh as a csv file.
     void WriteMeshVertices(const std::string& filename) const;
 
@@ -607,6 +610,7 @@ class CH_VEHICLE_API SCMLoader_Custom : public ChLoadContainer {
     ChTimer m_timer_preprocess;
     ChTimer m_timer_nn;
     ChTimer m_timer_postprocess;
+    ChTimer m_timer_postprocess2;
     ChTimer m_timer_contact_forces;
     ChTimer m_timer_bulldozing;
     ChTimer m_timer_bulldozing_boundary;

@@ -1513,6 +1513,10 @@ bool ChSystem::Integrate_Y() {
     // Tentatively mark system as unchanged (i.e., no updated necessary)
     is_updated = true;
 
+    // Pablo
+    std::cout << "Timer advance integrate Y (ms): " << 1e3 * timer_advance() << std::endl;
+    std::cout << "Timer total integrate Y (ms): " << 1e3 * timer_step() << std::endl;
+
     return true;
 }
 
