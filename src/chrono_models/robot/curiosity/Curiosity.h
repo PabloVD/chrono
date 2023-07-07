@@ -112,6 +112,14 @@ class CH_MODELS_API CuriosityPart {
     /// Initialize the rover part by attaching it to the specified chassis body.
     virtual void Initialize(std::shared_ptr<ChBodyAuxRef> chassis);
 
+     // Pablo
+
+    /// Get the specified vehicle wheel, by specifying the axle, side, and wheel location.
+    /// Axles are assumed to be indexed starting from the front of the vehicle. On each axle, wheels are assumed to be
+    /// ordered from inner to outer wheels, first left then right: for a single-wheel axle the order is left wheel,
+    /// right wheel; for a double-wheel axle, the order is inner left, inner right, outer left, outer right.
+    //std::shared_ptr<ChWheel> GetWheel(int axle, VehicleSide side, WheelLocation location = SINGLE) const;
+
   protected:
     /// Utility function for calculating mass properties using the part's collision mesh.
     void CalcMassProperties(double density);

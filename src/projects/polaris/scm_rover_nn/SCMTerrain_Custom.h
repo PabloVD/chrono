@@ -47,7 +47,10 @@
 #include "chrono/physics/ChParticleCloud.h"
 #include "chrono/assets/ChSphereShape.h"
 
-const int m_num_wheels = 4;
+#include "chrono_models/robot/curiosity/Curiosity.h"
+using namespace chrono::curiosity;
+
+const int m_num_wheels = 6;
 
 namespace chrono {
 namespace vehicle {
@@ -105,7 +108,7 @@ class CH_VEHICLE_API SCMTerrain_Custom : public SCMTerrain {
 
     ~SCMTerrain_Custom() {}
 
-    void EnterVehicle(std::shared_ptr<WheeledVehicle> vehicle);
+    void EnterVehicle(std::shared_ptr<Curiosity> vehicle);
 
     /// Set the plane reference.
     /// By default, the reference plane is horizontal with Z up (ISO vehicle reference frame).
@@ -354,7 +357,7 @@ class CH_VEHICLE_API SCMLoader_Custom : public ChLoadContainer {
     SCMLoader_Custom(ChSystem* system, bool visualization_mesh, bool use_nn, int num_wheels);
     ~SCMLoader_Custom() {}
 
-    void EnterVehicle(std::shared_ptr<WheeledVehicle> vehicle);
+    void EnterVehicle(std::shared_ptr<Curiosity> vehicle);
 
     /// Initialize the terrain system (flat).
     /// This version creates a flat array of points.
@@ -629,7 +632,8 @@ class CH_VEHICLE_API SCMLoader_Custom : public ChLoadContainer {
 
     // Pablo
     ChSystem* m_sys;
-    std::shared_ptr<chrono::vehicle::WheeledVehicle> m_vehicle;
+    //std::shared_ptr<chrono::vehicle::WheeledVehicle> m_vehicle;
+    std::shared_ptr<Curiosity> m_vehicle;
     std::array<std::shared_ptr<ChWheel>, m_num_wheels> m_wheels;
     ChVector<> m_box_size;
     ChVector<> m_box_offset;

@@ -734,5 +734,10 @@ void CuriositySpeedDriver::Update(double time) {
     drive_speeds = {speed, speed, speed, speed, speed, speed};
 }
 
+// Pablo
+// std::shared_ptr<ChWheel> ChWheeledVehicle::GetWheel(int axle, VehicleSide side, WheelLocation location) const {
+//     return m_wheels[id];
+// }
+
 }  // namespace curiosity
 }  // namespace chrono

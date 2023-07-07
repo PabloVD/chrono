@@ -37,6 +37,10 @@
 
 #include "chrono_models/vehicle/hmmwv/HMMWV.h"
 
+#include "chrono_models/robot/curiosity/Curiosity.h"
+#include "chrono_vehicle/ChVehicleModelData.h"
+
+
 #include "chrono_thirdparty/cxxopts/ChCLI.h"
 #include "chrono_thirdparty/filesystem/path.h"
 
@@ -48,6 +52,8 @@ using namespace chrono::collision;
 using namespace chrono::irrlicht;
 using namespace chrono::vehicle;
 using namespace chrono::vehicle::hmmwv;
+using namespace chrono::geometry;
+using namespace chrono::curiosity;
 
 using std::cout;
 using std::endl;
@@ -122,6 +128,17 @@ bool img_output = false;
 
 // Vertices output
 bool ver_output = false;
+
+// =============================================================================
+// Rover stuff
+// =============================================================================
+
+// Specify rover chassis type (Scarecrow or FullRover)
+CuriosityChassisType chassis_type = CuriosityChassisType::FullRover;
+
+// Specify rover wheel type (RealWheel, SimpleWheel, or CylWheel)
+CuriosityWheelType wheel_type = CuriosityWheelType::RealWheel;
+
 
 // =============================================================================
 
@@ -317,7 +334,6 @@ int main(int argc, char* argv[]) {
     // Create the Polaris vehicle
     // --------------------
 
-    cout << "Create vehicle..." << endl;
     // Initial vehicle position and orientation
     //ChCoordsys<> init_pos(ChVector<>(1.3, 0, 0.1), QUNIT);
 
@@ -333,12 +349,22 @@ int main(int argc, char* argv[]) {
     ChCoordsys<> init_pos(initLoc, initRot);
 
     cout << "Create vehicle..." << endl;
-    auto vehicle = CreateVehicle(sys, init_pos);
+    //auto vehicle = CreateVehicle(sys, init_pos);
+    std::shared_ptr<Curiosity> vehicle = chrono_types::make_shared<Curiosity>(&sys, chassis_type, wheel_type);
+    cout << "Llega hasta aqui" << endl;
+    //Curiosity rover(&sys, chassis_type, wheel_type);
+    vehicle->SetDriver(chrono_types::make_shared<CuriositySpeedDriver>(1.0, CH_C_PI));
+    //vehicle.Initialize(ChFrame<>(ChVector<>(-5, -0.2, 0), Q_from_AngX(-CH_C_PI / 2)));
+    cout << "Llega hasta aqui" << endl;
+    vehicle->Initialize(ChFrame<>(initLoc, initRot));
+    //std::shared_ptr<Curiosity> vehicle = std::make_shared<Curiosity>(rover);
     double x_max = (terrainLength/2.0 - 3.0);
     double y_max = (terrainWidth/2.0 - 3.0);
 
     terrain.EnterVehicle(vehicle);
 
+
+    cout << "Llega hasta aqui" << endl;
 
     // std::string vertices_filename = out_dir +  "/vertices_" + std::to_string(0) + ".csv";
     // terrain.WriteMeshVertices(vertices_filename);
@@ -347,19 +373,20 @@ int main(int argc, char* argv[]) {
     // Create the vehicle Irrlicht application
     // ---------------------------------------
     auto vis = chrono_types::make_shared<ChWheeledVehicleVisualSystemIrrlicht>();
-    vis->SetWindowTitle("Polaris SCM");
+    vis->SetWindowTitle("Rover SCM");
     vis->SetChaseCamera(trackPoint, 6.0, 0.5);
     vis->Initialize();
     vis->AddLightDirectional();
     vis->AddSkyBox();
     vis->AddLogo();
-    vis->AttachVehicle(vehicle.get());
+    //vis->AttachVehicle(vehicle.get());
+    //vis->AttachVehicle(vehicle);
 
     // --------------------
     // Create driver system
     // --------------------
-    MyDriver driver(*vehicle, 0.5);
-    driver.Initialize();
+    // MyDriver driver(*vehicle, 0.5);
+    // driver.Initialize();
 
     // -----------------
     // Initialize output
@@ -375,17 +402,17 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    DataWriterVehicle data_writer(&sys, vehicle, terrain);
-    data_writer.SetVerbose(verbose);
-    data_writer.SetMBSOutput(wheel_output);
-    data_writer.Initialize(out_dir, output_major_fps, step_size);
+    // DataWriterVehicle data_writer(&sys, vehicle, terrain);
+    // data_writer.SetVerbose(verbose);
+    // data_writer.SetMBSOutput(wheel_output);
+    // data_writer.Initialize(out_dir, output_major_fps, step_size);
     cout << "Simulation output data saved in: " << out_dir << endl;
     cout << "===============================================================================" << endl;
 
     // ---------------
     // Simulation loop
     // ---------------
-    std::cout << "Total vehicle mass: " << vehicle->GetMass() << std::endl;
+    //std::cout << "Total vehicle mass: " << vehicle->GetMass() << std::endl;
 
 
     // Number of simulation steps between two 3D view render frames
@@ -428,8 +455,8 @@ int main(int argc, char* argv[]) {
 
         timer_vis.stop();
 
-        if (ver_output)
-            data_writer.Process(step_number, t);
+        // if (ver_output)
+        //     data_writer.Process(step_number, t);
         
         if (step_number % render_steps == 0) {
             if (ver_output)
@@ -458,13 +485,13 @@ int main(int argc, char* argv[]) {
         timer_sync.start();
 
         // // Driver inputs
-        DriverInputs driver_inputs = driver.GetInputs();
-        // DriverInputs driver_inputs = {0.0, 0.0, 0.0};
+        //DriverInputs driver_inputs = driver.GetInputs();
+        DriverInputs driver_inputs = {0.0, 0.0, 0.0};
 
         // // Update modules
-        driver.Synchronize(t);
+        //driver.Synchronize(t);
         terrain.Synchronize(t);
-        vehicle->Synchronize(t, driver_inputs, terrain);
+        //vehicle->Synchronize(t, driver_inputs, terrain);
         vis->Synchronize(t, driver_inputs);
 
         timer_sync.stop();

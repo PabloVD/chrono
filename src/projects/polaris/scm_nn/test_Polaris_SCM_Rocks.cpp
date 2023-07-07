@@ -344,7 +344,7 @@ int main(int argc, char* argv[]) {
     // Create the terrain
     // ------------------
 
-    SCMTerrain_Custom terrain(&sys, true, use_nn);
+    SCMTerrain_Custom terrain(&sys, true, use_nn, 4);
     //SCMTerrain_Custom terrain(&sys, vehicle);
     // SCMDeformableTerrain terrain(system);
 

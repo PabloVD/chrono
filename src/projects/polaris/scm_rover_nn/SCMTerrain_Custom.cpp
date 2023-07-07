@@ -38,9 +38,11 @@
 
 #include "chrono_thirdparty/stb/stb.h"
 
+#include "chrono_models/robot/curiosity/Curiosity.h"
 
 using std::cout;
 using std::endl;
+using namespace chrono::curiosity;
 
 namespace chrono {
 namespace vehicle {
@@ -55,7 +57,7 @@ SCMTerrain_Custom::SCMTerrain_Custom(ChSystem* system, bool visualization_mesh, 
 }
 
 // Initialize the terrain as a flat grid.
-void SCMTerrain_Custom::EnterVehicle(std::shared_ptr<WheeledVehicle> vehicle) {
+void SCMTerrain_Custom::EnterVehicle(std::shared_ptr<Curiosity> vehicle) {
     m_loader->EnterVehicle(vehicle);
 }
 
@@ -470,15 +472,15 @@ SCMLoader_Custom::SCMLoader_Custom(ChSystem* system, bool visualization_mesh, bo
 }
 
 //TODO Deniz - make sure that this function is called always before running the simulation.
-void SCMLoader_Custom::EnterVehicle(std::shared_ptr<WheeledVehicle> vehicle) {
+void SCMLoader_Custom::EnterVehicle(std::shared_ptr<Curiosity> vehicle) {
 
     m_vehicle = vehicle;
 
     // Pablo
-    for (int i = 0; i < m_num_wheels/2; i++) {
-        m_wheels[2*i] = m_vehicle->GetWheel(i, LEFT);
-        m_wheels[2*i+1] = m_vehicle->GetWheel(i, RIGHT);
-    }
+    // for (int i = 0; i < m_num_wheels/2; i++) {
+    //     m_wheels[i] = m_vehicle->GetWheel(i, LEFT);
+    //     m_wheels[2*i+1] = m_vehicle->GetWheel(i, RIGHT);
+    // }
 
     // Set default size and offset of sampling box
     tire_radius = m_wheels[0]->GetTire()->GetRadius();

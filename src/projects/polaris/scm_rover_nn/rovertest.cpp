@@ -37,6 +37,8 @@
 
 #include "chrono_models/vehicle/hmmwv/HMMWV.h"
 
+#include "chrono_models/robot/curiosity/Curiosity.h"
+
 #include "chrono_thirdparty/cxxopts/ChCLI.h"
 #include "chrono_thirdparty/filesystem/path.h"
 
@@ -48,6 +50,7 @@ using namespace chrono::collision;
 using namespace chrono::irrlicht;
 using namespace chrono::vehicle;
 using namespace chrono::vehicle::hmmwv;
+using namespace chrono::curiosity;
 
 using std::cout;
 using std::endl;
@@ -122,6 +125,17 @@ bool img_output = false;
 
 // Vertices output
 bool ver_output = false;
+
+// =============================================================================
+// Rover stuff
+// =============================================================================
+
+// Specify rover chassis type (Scarecrow or FullRover)
+CuriosityChassisType chassis_type = CuriosityChassisType::FullRover;
+
+// Specify rover wheel type (RealWheel, SimpleWheel, or CylWheel)
+CuriosityWheelType wheel_type = CuriosityWheelType::RealWheel;
+
 
 // =============================================================================
 
@@ -333,167 +347,10 @@ int main(int argc, char* argv[]) {
     ChCoordsys<> init_pos(initLoc, initRot);
 
     cout << "Create vehicle..." << endl;
-    auto vehicle = CreateVehicle(sys, init_pos);
-    double x_max = (terrainLength/2.0 - 3.0);
-    double y_max = (terrainWidth/2.0 - 3.0);
-
-    terrain.EnterVehicle(vehicle);
-
-
-    // std::string vertices_filename = out_dir +  "/vertices_" + std::to_string(0) + ".csv";
-    // terrain.WriteMeshVertices(vertices_filename);
-
-    // ---------------------------------------
-    // Create the vehicle Irrlicht application
-    // ---------------------------------------
-    auto vis = chrono_types::make_shared<ChWheeledVehicleVisualSystemIrrlicht>();
-    vis->SetWindowTitle("Polaris SCM");
-    vis->SetChaseCamera(trackPoint, 6.0, 0.5);
-    vis->Initialize();
-    vis->AddLightDirectional();
-    vis->AddSkyBox();
-    vis->AddLogo();
-    vis->AttachVehicle(vehicle.get());
-
-    // --------------------
-    // Create driver system
-    // --------------------
-    MyDriver driver(*vehicle, 0.5);
-    driver.Initialize();
-
-    // -----------------
-    // Initialize output
-    // -----------------
-    if (!filesystem::create_directory(filesystem::path(out_dir))) {
-        std::cout << "Error creating directory " << out_dir << std::endl;
-        return 1;
-    }
-    if (img_output) {
-        if (!filesystem::create_directory(filesystem::path(img_dir))) {
-            std::cout << "Error creating directory " << img_dir << std::endl;
-            return 1;
-        }
-    }
-
-    DataWriterVehicle data_writer(&sys, vehicle, terrain);
-    data_writer.SetVerbose(verbose);
-    data_writer.SetMBSOutput(wheel_output);
-    data_writer.Initialize(out_dir, output_major_fps, step_size);
-    cout << "Simulation output data saved in: " << out_dir << endl;
-    cout << "===============================================================================" << endl;
-
-    // ---------------
-    // Simulation loop
-    // ---------------
-    std::cout << "Total vehicle mass: " << vehicle->GetMass() << std::endl;
-
-
-    // Number of simulation steps between two 3D view render frames
-    int render_steps = (int)std::ceil(render_step_size / step_size);
-
-    // Initialize simulation frame counter
-    int step_number = 0;
-    int render_frame = 0;
-    double t = 0;
-    //while (t < tend) {
-
-
-    ChTimer timer_tot, timer_sync, timer_vis, timer_advance;
+    //auto vehicle = CreateVehicle(sys, init_pos);
+    //std::shared_ptr<Curiosity> vehicle = chrono_types::make_shared<Curiosity>(&sys, chassis_type, wheel_type);
+    Curiosity rover(&sys, chassis_type, wheel_type);
     
-
-    while (vis->Run()) {
-
-        timer_sync.reset();
-        timer_vis.reset();
-        timer_advance.reset();
-        timer_tot.reset();
-
-        timer_tot.start();
-    
-
-        // const auto& veh_loc = vehicle->GetPos();
-        // std::cout<<"veh_loc ="<<veh_loc<<std::endl;
-        // Stop before end of patch
-        // if (veh_loc.x() > x_max || veh_loc.y() > y_max )
-        //     break;
-
-        timer_vis.start();
-
-        // Render scene
-        vis->Run();
-        vis->BeginScene();
-        vis->Render();
-        tools::drawColorbar(vis.get(), 0, 0.1, "Sinkage", 30);
-        vis->EndScene();
-
-        timer_vis.stop();
-
-        if (ver_output)
-            data_writer.Process(step_number, t);
-        
-        if (step_number % render_steps == 0) {
-            if (ver_output)
-            {   
-            std::string vertices_filename = out_dir +  "/vertices_" + std::to_string(render_frame) + ".csv";
-            if (step_number==0)
-            {
-             terrain.WriteMeshVertices(vertices_filename);
-            }
-            else
-            {
-             //terrain.WriteMeshVerticesinz(vertices_filename);
-             terrain.WriteModifiedMeshVertices(vertices_filename);
-            }
-            }
-            if (img_output)
-            {
-            //char filename[100];
-            //sprintf(filename, "%s/img_%03d.jpg", img_dir.c_str(), render_frame + 1);
-            std::string  filename = img_dir + "/img_"+ std::to_string(render_frame) +".jpg";
-            vis->WriteImageToFile(filename);
-            }
-            render_frame++;
-        }
-
-        timer_sync.start();
-
-        // // Driver inputs
-        DriverInputs driver_inputs = driver.GetInputs();
-        // DriverInputs driver_inputs = {0.0, 0.0, 0.0};
-
-        // // Update modules
-        driver.Synchronize(t);
-        terrain.Synchronize(t);
-        vehicle->Synchronize(t, driver_inputs, terrain);
-        vis->Synchronize(t, driver_inputs);
-
-        timer_sync.stop();
-        timer_advance.start();
-
-        // Advance dynamics
-        sys.DoStepDynamics(step_size);
-        vis->Advance(step_size);
-        t += step_size;
-
-        timer_advance.stop();
-        timer_tot.stop();
-
-        // Increment frame number
-        step_number++;
-
-        // Pablo
-        if (print_stats){
-            terrain.PrintStepStatistics(cout);
-            std::cout << "Visualization time by step (ms): " << 1e3 * timer_vis() << std::endl;
-            std::cout << "Synchronization time by step (ms): " << 1e3 * timer_sync() << std::endl;
-            std::cout << "Advance time by step (ms): " << 1e3 * timer_advance() << std::endl;
-            std::cout << "Total time by step (ms): " << 1e3 * timer_tot() << std::endl;
-            
-        }
-
-        if (t>=tend)
-            break;
-    }
 
     return 0;
 }
