@@ -1233,7 +1233,7 @@ void SCMLoader_Custom::ComputeInternalForces() {
 
     // Prepare NN model inputs
     // const auto& p_all = m_particles->GetParticles();
-    //std::vector<torch::jit::IValue> inputs;
+    std::vector<torch::jit::IValue> inputs;
     
     std::array<ChVector<float>, m_num_wheels> w_pos;
     std::array<ChQuaternion<float>, m_num_wheels> w_rot;
@@ -1243,14 +1243,6 @@ void SCMLoader_Custom::ComputeInternalForces() {
     std::array<bool, m_num_wheels> w_contact;
     std::array<ChContactable*, m_num_wheels> w_contactable;
     std::array<ChVector2<int>, m_num_wheels> w_startindex;
-
-    torch::Tensor pos_tensor, wpos_tensor, quat_tensor, linvel_tensor, angvel_tensor, glob_tensor;
-    pos_tensor = torch::zeros({m_num_wheels*gridsize*gridsize, 4}, torch::kFloat32);
-    wpos_tensor = torch::zeros({m_num_wheels, 3}, torch::kFloat32);
-    quat_tensor = torch::zeros({m_num_wheels, 4}, torch::kFloat32);
-    linvel_tensor = torch::zeros({m_num_wheels, 3}, torch::kFloat32);
-    angvel_tensor = torch::zeros({m_num_wheels, 3}, torch::kFloat32);
-    glob_tensor = torch::zeros({m_num_wheels, 6}, torch::kFloat32);
 
     // Loop over all vehicle wheels
     for (int i = 0; i < m_num_wheels; i++) {
@@ -1307,13 +1299,14 @@ void SCMLoader_Custom::ComputeInternalForces() {
             ij.y() = l;
             double z = GetHeight(ij);
 
+
             *part_pos_data++ = x;
             *part_pos_data++ = y;
             *part_pos_data++ = z;
             
             // Get sinkage
             const ChVector<> loc(x,y,z);
-            const auto& initheight = GetInitHeight(loc);
+            const auto& initheight=GetInitHeight(loc);
             //std::cout<<"initheight= "<<initheight<<std::endl;
             *part_pos_data++ = initheight-z;
 
@@ -1329,51 +1322,34 @@ void SCMLoader_Custom::ComputeInternalForces() {
         auto w_linvel_t = torch::from_blob((void*)w_linvel[i].data(), {3}, torch::kFloat32);
         auto w_angvel_t = torch::from_blob((void*)w_angvel[i].data(), {3}, torch::kFloat32);
 
-        pos_tensor.index({torch::indexing::Slice(i*gridsize*gridsize,(i+1)*gridsize*gridsize)}) = part_pos;
-        wpos_tensor[i] = w_pos_t;
-        quat_tensor[i] = w_rot_t;
-        linvel_tensor[i] = w_linvel_t;
-        angvel_tensor[i] = w_angvel_t;
-
-// #if 0
-//         if (true) {
-//             std::cout << "wheel " << i << std::endl;
-//             std::cout << "  num. particles: " << m_num_particles[i] << std::endl;
-//             std::cout << "  position:       " << w_pos[i] << std::endl;
-//             std::cout << "  pos. address:   " << w_pos[i].data() << std::endl;
-//             std::cout << "  in contact:     " << w_contact[i] << std::endl;
-//         }
-// #endif        
+#if 0
+        if (true) {
+            std::cout << "wheel " << i << std::endl;
+            std::cout << "  num. particles: " << m_num_particles[i] << std::endl;
+            std::cout << "  position:       " << w_pos[i] << std::endl;
+            std::cout << "  pos. address:   " << w_pos[i].data() << std::endl;
+            std::cout << "  in contact:     " << w_contact[i] << std::endl;
+        }
+#endif        
 
         // Prepare the tuple input for this wheel
-        // std::vector<torch::jit::IValue> tuple;
-        // tuple.push_back(part_pos);
-        // tuple.push_back(w_pos_t);
-        // tuple.push_back(w_rot_t);
-        // tuple.push_back(w_linvel_t);
-        // tuple.push_back(w_angvel_t);
+        std::vector<torch::jit::IValue> tuple;
+        tuple.push_back(part_pos);
+        tuple.push_back(w_pos_t);
+        tuple.push_back(w_rot_t);
+        tuple.push_back(w_linvel_t);
+        tuple.push_back(w_angvel_t);
 
-        // // Add this wheel's tuple to NN model inputs
-        // inputs.push_back(torch::ivalue::Tuple::create(tuple));
-        // //std::cout << " num. particles: " << m_num_particles[i] << std::endl;
+        // Add this wheel's tuple to NN model inputs
+        inputs.push_back(torch::ivalue::Tuple::create(tuple));
+        //std::cout << " num. particles: " << m_num_particles[i] << std::endl;
     }
-
-    // Prepare the tuple input for this wheel
-    glob_tensor = torch::cat({linvel_tensor, angvel_tensor},1);
-
-    //std::cout << pos_tensor.sizes() << glob_tensor.sizes() << std::endl;
-
-    std::vector<torch::jit::IValue> inputs;
-    inputs.push_back(pos_tensor);
-    inputs.push_back(wpos_tensor);
-    inputs.push_back(quat_tensor);
-    inputs.push_back(glob_tensor);
 
     // std::cout << " Tot Num. particles: " << m_num_particles[0] +m_num_particles[1]+m_num_particles[2]+m_num_particles[3] << std::endl;
 
     // Verbose flag
-    // m_verbose=true;
-    // inputs.push_back(m_verbose);
+    m_verbose=true;
+    inputs.push_back(m_verbose);
 
     m_timer_preprocess.stop();
 
@@ -2228,9 +2204,9 @@ void SCMLoader_Custom::SetModifiedNodes(const std::vector<SCMTerrain_Custom::Nod
 
 
 bool SCMLoader_Custom::Load(const std::string& pt_file) {
-    // std::cout << "cuda version " << torch::cuda_version() << std::endl;
-    // torch::Tensor tensor = torch::eye(3);
-    // std::cout << tensor << std::endl;
+    //std::cout << "cuda version " << torch::cuda_version() << std::endl;
+    torch::Tensor tensor = torch::eye(3);
+    std::cout << tensor << std::endl;
 
     std::ifstream is(pt_file, std::ios_base::binary);
     try {
