@@ -55,8 +55,8 @@ SCMTerrain_Custom::SCMTerrain_Custom(ChSystem* system, bool visualization_mesh, 
 }
 
 // Initialize the terrain as a flat grid.
-void SCMTerrain_Custom::EnterVehicle(std::shared_ptr<WheeledVehicle> vehicle) {
-    m_loader->EnterVehicle(vehicle);
+void SCMTerrain_Custom::EnterVehicle(std::shared_ptr<WheeledVehicle> vehicle, int id_vehicle) {
+    m_loader->EnterVehicle(vehicle, id_vehicle);
 }
 
 // Get the initial terrain height below the specified location.
@@ -216,7 +216,6 @@ void SCMTerrain_Custom::PrintStepStatistics(std::ostream& os) const {
     os << "   Preprocess NN:           " << 1e3 * m_loader->m_timer_preprocess() << std::endl;
     os << "   Neural Network:          " << 1e3 * m_loader->m_timer_nn() << std::endl;
     os << "   Postprocess NN:          " << 1e3 * m_loader->m_timer_postprocess() << std::endl;
-    os << "   Postprocess NN (global hits):          " << 1e3 * m_loader->m_timer_postprocess2() << std::endl;
     os << "   Contact forces:          " << 1e3 * m_loader->m_timer_contact_forces() << std::endl;
     os << "   Bulldozing:              " << 1e3 * m_loader->m_timer_bulldozing() << std::endl;
     os << "      Raise boundary:       " << 1e3 * m_loader->m_timer_bulldozing_boundary() << std::endl;
@@ -408,8 +407,8 @@ SCMLoader_Custom::SCMLoader_Custom(ChSystem* system, bool visualization_mesh, bo
 
     std::cout << "Inside SCMLoader_Custom" << std::endl;
     // std::cout << "cuda version " << scatter::cuda_version() << std::endl;
-    torch::Tensor tensor = torch::eye(3);
-    std::cout << tensor << std::endl;
+    // torch::Tensor tensor = torch::eye(3);
+    // std::cout << tensor << std::endl;
 
     if (visualization_mesh) {
         // Create the visualization mesh and asset
@@ -470,14 +469,14 @@ SCMLoader_Custom::SCMLoader_Custom(ChSystem* system, bool visualization_mesh, bo
 }
 
 //TODO Deniz - make sure that this function is called always before running the simulation.
-void SCMLoader_Custom::EnterVehicle(std::shared_ptr<WheeledVehicle> vehicle) {
+void SCMLoader_Custom::EnterVehicle(std::shared_ptr<WheeledVehicle> vehicle, int id_vehicle) {
 
-    m_vehicle = vehicle;
+    //m_vehicle = vehicle;
 
     // Pablo
     for (int i = 0; i < m_num_wheels/2; i++) {
-        m_wheels[2*i] = m_vehicle->GetWheel(i, LEFT);
-        m_wheels[2*i+1] = m_vehicle->GetWheel(i, RIGHT);
+        m_wheels[4*id_vehicle+2*i] = vehicle->GetWheel(i, LEFT);
+        m_wheels[4*id_vehicle+2*i+1] = vehicle->GetWheel(i, RIGHT);
     }
 
     // Set default size and offset of sampling box
@@ -1161,7 +1160,6 @@ void SCMLoader_Custom::ComputeInternalForces() {
     m_timer_preprocess.reset();
     m_timer_nn.reset();
     m_timer_postprocess.reset();
-    m_timer_postprocess2.reset();
     m_timer_contact_forces.reset();
     m_timer_bulldozing.reset();
     m_timer_bulldozing_boundary.reset();
@@ -1399,14 +1397,16 @@ void SCMLoader_Custom::ComputeInternalForces() {
    
     // Loop over all vehicle wheels
     int nthreads = GetSystem()->GetNumThreadsChrono();
+    //std::cout << nthreads << std::endl;
     //nthreads = 4;
     std::vector<std::unordered_map<ChVector2<int>, HitRecord, CoordHash>> t_hits(nthreads);
-    #pragma omp parallel for num_threads(nthreads)
+    //#pragma omp parallel for num_threads(nthreads)
     //#pragma omp parallel for num_threads(nthreads) collapse(6)
-    for (int i = 0; i < m_num_wheels; i++) {
-     int t_num = ChOMP::GetThreadNum();
+    // for (int i = 0; i < m_num_wheels; i++) {
+    //  int t_num = ChOMP::GetThreadNum();
      // Test for newhits
-     const auto& w_out = outputs.toTuple()->elements()[i].toTensor();
+    //const auto& w_out = outputs.toTuple()->elements()[i].toTensor();
+    const auto& w_out = outputs.toTensor();
 
 
      // For each node around the wheel
@@ -1416,12 +1416,14 @@ void SCMLoader_Custom::ComputeInternalForces() {
     //for (size_t j = 0; j < gridsize*gridsize; j++) {
     //for (size_t j = 0; j < 82; j++) {
     // int nthreads2 = GetSystem()->GetNumThreadsChrono()-4;
-    // #pragma omp parallel for num_threads(nthreads2)
+    #pragma omp parallel for num_threads(nthreads)
     for (size_t j = 0; j < w_out.sizes()[0]; j++) {
+        int t_num = ChOMP::GetThreadNum();
 
         float pos_x = w_out[j][0].item<float>();
         float pos_y = w_out[j][1].item<float>();
         float def_z = w_out[j][2].item<float>();
+        int i = w_out[j][3].item<int>();
         // float pos_x = wpart[0].item<float>();
         // float pos_y = wpart[1].item<float>();
         // float def_z = wpart[2].item<float>();
@@ -1456,15 +1458,20 @@ void SCMLoader_Custom::ComputeInternalForces() {
         if ((new_part_pos - w_pos[i]).Length2() <  std::pow(tire_radius + margin_factor, 2) ){
             
             HitRecord record = {w_contactable[i], new_part_pos, i};
-            // newhits.insert(std::make_pair(indexes, record));
+            //auto h = std::make_pair(indexes, record);
+            //newhits.insert(h);
             t_hits[t_num].insert(std::make_pair(indexes, record));
+
+            // if (m_grid_map.find(h.first) == m_grid_map.end()) {
+            //         double z = GetInitHeight(h.first);
+            //         m_grid_map.insert(std::make_pair(h.first, NodeRecord(z, z, GetInitNormal(h.first))));
+            //     }
         }
        
         }
-    }
+    //}
 
-    m_timer_postprocess.stop();
-    m_timer_postprocess2.start();
+    
 
     // Sequential insertion in global hits
         for (int t_num = 0; t_num < nthreads; t_num++) {
@@ -1479,7 +1486,7 @@ void SCMLoader_Custom::ComputeInternalForces() {
             t_hits[t_num].clear();
         }
 
-    m_timer_postprocess2.stop();
+    m_timer_postprocess.stop();
 
     }
 
@@ -2248,39 +2255,39 @@ bool SCMLoader_Custom::Load(const std::string& pt_file) {
     return true;
 }
 
-// Pablo
-void SCMLoader_Custom::Create(const std::string& terrain_dir, bool vis) {
+// Pablo (not used I think)
+// void SCMLoader_Custom::Create(const std::string& terrain_dir, bool vis) {
 
-    m_particles = chrono_types::make_shared<ChParticleCloud>();
-    m_particles->SetFixed(true);
-    int num_particles = 0;
+//     m_particles = chrono_types::make_shared<ChParticleCloud>();
+//     m_particles->SetFixed(true);
+//     int num_particles = 0;
 
-    // std::cout<<"SCMLoader_Custom::Create"<<std::endl;
-    // std::cout<<"m_patches.size()= "<<m_patches.size()<<std::endl;
-    for (auto& p : m_patches) {
-        for (int k = 0; k < p.m_range.size(); k++) {
-            ChVector2<int> ij = p.m_range[k];
-            // Move from (i, j) to (x, y, z) representation in the world frame
-            double x = ij.x() * m_delta;
-            double y = ij.y() * m_delta;
-            double z = GetHeight(ij);
-            m_particles->AddParticle(ChCoordsys<>(ChVector<>(x, y, z)));
-            num_particles++;
-        }
-        }
+//     // std::cout<<"SCMLoader_Custom::Create"<<std::endl;
+//     // std::cout<<"m_patches.size()= "<<m_patches.size()<<std::endl;
+//     for (auto& p : m_patches) {
+//         for (int k = 0; k < p.m_range.size(); k++) {
+//             ChVector2<int> ij = p.m_range[k];
+//             // Move from (i, j) to (x, y, z) representation in the world frame
+//             double x = ij.x() * m_delta;
+//             double y = ij.y() * m_delta;
+//             double z = GetHeight(ij);
+//             m_particles->AddParticle(ChCoordsys<>(ChVector<>(x, y, z)));
+//             num_particles++;
+//         }
+//         }
 
-    // m_sys->Add(m_particles);
+//     // m_sys->Add(m_particles);
 
-    if (vis) {
-        auto sph = chrono_types::make_shared<ChSphereShape>();
-        sph->GetSphereGeometry().rad = 0.01;
-        m_particles->AddVisualShape(sph);
-    }
+//     if (vis) {
+//         auto sph = chrono_types::make_shared<ChSphereShape>();
+//         sph->GetSphereGeometry().rad = 0.01;
+//         m_particles->AddVisualShape(sph);
+//     }
 
-    // Initial size of sampling box particle vectors
-    // for (int i = 0; i < m_num_wheels; i++)
-    //     m_wheel_particles[i].resize(num_particles);
-}
+//     // Initial size of sampling box particle vectors
+//     // for (int i = 0; i < m_num_wheels; i++)
+//     //     m_wheel_particles[i].resize(num_particles);
+// }
 
 
 }  // end namespace vehicle

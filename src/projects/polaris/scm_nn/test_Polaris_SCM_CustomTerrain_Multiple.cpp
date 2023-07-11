@@ -43,15 +43,11 @@
 #include "DataWriter.h"
 #include "CreateObjects.h"
 
-#include "chrono/assets/ChTriangleMeshShape.h"
-#include "chrono/physics/ChInertiaUtils.h"
-
 using namespace chrono;
 using namespace chrono::collision;
 using namespace chrono::irrlicht;
 using namespace chrono::vehicle;
 using namespace chrono::vehicle::hmmwv;
-using namespace chrono::geometry;
 
 using std::cout;
 using std::endl;
@@ -64,7 +60,6 @@ using std::endl;
 
 // torch::Tensor tensor = torch::eye(3);
 // std::cout << tensor << std::endl;
-
 
 bool GetProblemSpecs(int argc,
                      char** argv,
@@ -83,10 +78,10 @@ double tend = 0.5;
 
 // double terrainLength = 8.0;  // size in X direction
 // double terrainWidth = 3.0;    // size in Y direction
+// double terrainLength = 15.0;  // size in X direction
+// double terrainWidth = 3.0;    // size in Y direction
 double terrainLength = 35.0;  // size in X direction
-double terrainWidth = 4.0;    // size in Y direction
-// double terrainLength = 35.0;  // size in X direction
-// double terrainWidth = 17.5;    // size in Y direction
+double terrainWidth = 17.5;    // size in Y direction
 // double terrainLength = 100.0;  // size in X direction
 // double terrainWidth = 6.0;    // size in Y direction
 // double terrainLength = 70.0;  // size in X direction
@@ -98,8 +93,8 @@ double steering=0.;
 bool heightmapterrain=true;
 double initheight=0.1;
 //double maxheight = 0.5;
-//double maxheight = 1.5*35.0/40.0;
-double maxheight = 3.;
+double maxheight = 1.5*35.0/40.0;
+//double maxheight = 3.;
 
 // Flag for using NN
 //bool use_nn = 1;
@@ -127,8 +122,6 @@ bool img_output = false;
 
 // Vertices output
 bool ver_output = false;
-
-bool use_rocks = true;
 
 // =============================================================================
 
@@ -227,7 +220,7 @@ int main(int argc, char* argv[]) {
     double output_major_fps = 1.0/render_step_size;
 
     // Output directories
-    std::string out_dir = GetChronoOutputPath() + "POLARIS_SCM_ROCKS";
+    std::string out_dir = GetChronoOutputPath() + "POLARIS_SCM";
     
     if (use_nn){
         out_dir +=  "_nn";
@@ -265,79 +258,6 @@ int main(int argc, char* argv[]) {
     sys.SetNumThreads(std::min(8, ChOMP::GetNumProcs()));
     const ChVector<> gravity(0, 0, -9.81);
     sys.Set_G_acc(gravity);
-
-
-    // --------------------
-    // Create obstacles
-    // --------------------
-    
-    if (use_rocks){
-
-    std::vector<std::shared_ptr<ChBodyAuxRef>> rock;
-
-    //std::string rockpath = "/home/tda/CARLA/chrono_scm_newcode/build_cuda/data/vehicle/terrain/scm/rocks/";
-    std::string rockpath = "robot/curiosity/rocks/";
-    //std::string rockpath = "terrain/scm/rocks/";
-    
-    std::vector<std::string> rock_meshfile = {
-        rockpath+"rock1.obj", rockpath+"rock1.obj",  //
-        rockpath+"rock1.obj", rockpath+"rock1.obj",  //
-        rockpath+"rock3.obj", rockpath+"rock3.obj"   //
-    };
-    double rock_height = 0.5;
-    double rock_sep = 0.5;
-    double rock_initx = -0.5;
-    std::vector<ChVector<>> rock_pos = {
-        ChVector<>(rock_initx, -rock_sep, rock_height), ChVector<>(rock_initx, rock_sep, rock_height), //
-        ChVector<>(rock_initx+1.5, -rock_sep, rock_height), ChVector<>(rock_initx+1.5, rock_sep, rock_height), //
-        ChVector<>(rock_initx+3, -rock_sep, rock_height), ChVector<>(rock_initx+3, rock_sep, rock_height) //
-    };
-    std::vector<double> rock_scale = {
-        0.8,  0.8,   //
-        0.45, 0.45,  //
-        0.45, 0.45   //
-    };
-    double rock_density = 8000;
-    std::shared_ptr<ChMaterialSurface> rock_mat = ChMaterialSurface::DefaultMaterial(sys.GetContactMethod());
-
-    for (int i = 0; i < 6; i++) {
-        //std::cout << "Reading from " << GetChronoDataFile(rock_meshfile[i]) << std::endl;
-        auto mesh = ChTriangleMeshConnected::CreateFromWavefrontFile(GetChronoDataFile(rock_meshfile[i]), false, true);
-        mesh->Transform(ChVector<>(0, 0, 0), ChMatrix33<>(rock_scale[i]));
-        mesh->Transform(ChVector<>(0, 0, 0), Q_from_AngX(-CH_C_PI_2));
-        
-
-        double mass;
-        ChVector<> cog;
-        ChMatrix33<> inertia;
-        mesh->ComputeMassProperties(true, mass, cog, inertia);
-        ChMatrix33<> principal_inertia_rot;
-        ChVector<> principal_I;
-        ChInertiaUtils::PrincipalInertia(inertia, principal_I, principal_inertia_rot);
-
-        auto body = chrono_types::make_shared<ChBodyAuxRef>();
-        sys.Add(body);
-        body->SetBodyFixed(false);
-        body->SetFrame_REF_to_abs(ChFrame<>(ChVector<>(rock_pos[i]), QUNIT));
-        body->SetFrame_COG_to_REF(ChFrame<>(cog, principal_inertia_rot));
-        body->SetMass(mass * rock_density);
-        body->SetInertiaXX(rock_density * principal_I);
-
-        body->GetCollisionModel()->ClearModel();
-        body->GetCollisionModel()->AddTriangleMesh(rock_mat, mesh, false, false, VNULL, ChMatrix33<>(1),
-                                                   0.005);
-        body->GetCollisionModel()->BuildModel();
-        body->SetCollide(true);
-
-        auto mesh_shape = chrono_types::make_shared<ChTriangleMeshShape>();
-        mesh_shape->SetMesh(mesh);
-        mesh_shape->SetBackfaceCull(true);
-        body->AddVisualShape(mesh_shape);
-
-        rock.push_back(body);
-    }
-    }
-
 
 
     // ------------------
@@ -427,17 +347,13 @@ int main(int argc, char* argv[]) {
     // Create the vehicle Irrlicht application
     // ---------------------------------------
     auto vis = chrono_types::make_shared<ChWheeledVehicleVisualSystemIrrlicht>();
-    vis->SetWindowTitle("HMMWV Deformable Soil Demo");
-    //vis->SetCameraVertical(CameraVerticalDir::Y);
-    //vis->AddCamera(ChVector<>(init_x, 0., 5.0), ChVector<>(-5.0, 0.0, 0.0));
+    vis->SetWindowTitle("Polaris SCM");
     vis->SetChaseCamera(trackPoint, 6.0, 0.5);
     vis->Initialize();
     vis->AddLightDirectional();
     vis->AddSkyBox();
     vis->AddLogo();
     vis->AttachVehicle(vehicle.get());
-    vis->SetChaseCameraPosition(trackPoint + ChVector<>(0,-4,2));
-    vis->SetChaseCameraAngle(90);
 
     // --------------------
     // Create driver system
@@ -445,7 +361,6 @@ int main(int argc, char* argv[]) {
     MyDriver driver(*vehicle, 0.5);
     driver.Initialize();
 
-    
     // -----------------
     // Initialize output
     // -----------------
@@ -514,7 +429,7 @@ int main(int argc, char* argv[]) {
         timer_vis.stop();
 
         if (ver_output)
-            data_writer.Process(step_number, t); 
+            data_writer.Process(step_number, t);
         
         if (step_number % render_steps == 0) {
             if (ver_output)
@@ -532,8 +447,8 @@ int main(int argc, char* argv[]) {
             }
             if (img_output)
             {
-            // char filename[100];
-            // sprintf(filename, "%s/img_%03d.jpg", img_dir.c_str(), render_frame + 1);
+            //char filename[100];
+            //sprintf(filename, "%s/img_%03d.jpg", img_dir.c_str(), render_frame + 1);
             std::string  filename = img_dir + "/img_"+ std::to_string(render_frame) +".jpg";
             vis->WriteImageToFile(filename);
             }
@@ -561,6 +476,7 @@ int main(int argc, char* argv[]) {
         t += step_size;
 
         timer_advance.stop();
+        timer_tot.stop();
 
         // Increment frame number
         step_number++;
@@ -568,7 +484,6 @@ int main(int argc, char* argv[]) {
         // Pablo
         if (print_stats){
             terrain.PrintStepStatistics(cout);
-            timer_tot.stop();
             std::cout << "Visualization time by step (ms): " << 1e3 * timer_vis() << std::endl;
             std::cout << "Synchronization time by step (ms): " << 1e3 * timer_sync() << std::endl;
             std::cout << "Advance time by step (ms): " << 1e3 * timer_advance() << std::endl;

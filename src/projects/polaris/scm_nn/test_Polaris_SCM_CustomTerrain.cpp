@@ -337,7 +337,7 @@ int main(int argc, char* argv[]) {
     double x_max = (terrainLength/2.0 - 3.0);
     double y_max = (terrainWidth/2.0 - 3.0);
 
-    terrain.EnterVehicle(vehicle);
+    terrain.EnterVehicle(vehicle, 0);
 
 
     // std::string vertices_filename = out_dir +  "/vertices_" + std::to_string(0) + ".csv";
