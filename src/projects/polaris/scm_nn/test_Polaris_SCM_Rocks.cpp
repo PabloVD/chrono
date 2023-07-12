@@ -271,7 +271,7 @@ int main(int argc, char* argv[]) {
     // Create obstacles
     // --------------------
     
-    if (use_rocks){
+    //if (use_rocks){
 
     std::vector<std::shared_ptr<ChBodyAuxRef>> rock;
 
@@ -300,7 +300,7 @@ int main(int argc, char* argv[]) {
     double rock_density = 8000;
     std::shared_ptr<ChMaterialSurface> rock_mat = ChMaterialSurface::DefaultMaterial(sys.GetContactMethod());
 
-    for (int i = 0; i < 6; i++) {
+    for (int i = 0; i < m_num_rocks; i++) {
         //std::cout << "Reading from " << GetChronoDataFile(rock_meshfile[i]) << std::endl;
         auto mesh = ChTriangleMeshConnected::CreateFromWavefrontFile(GetChronoDataFile(rock_meshfile[i]), false, true);
         mesh->Transform(ChVector<>(0, 0, 0), ChMatrix33<>(rock_scale[i]));
@@ -336,8 +336,9 @@ int main(int argc, char* argv[]) {
 
         rock.push_back(body);
     }
-    }
+    //}
 
+    cout << rock.size() << endl;
 
 
     // ------------------
@@ -419,6 +420,16 @@ int main(int argc, char* argv[]) {
 
     terrain.EnterVehicle(vehicle,0);
 
+    cout << "here1" << endl;
+
+    if (use_rocks){
+        for (int i = 0; i < m_num_rocks; i++) {
+            terrain.EnterRock(rock[i],i);
+    }
+    }
+
+    cout << "here2" << endl;
+    
 
     // std::string vertices_filename = out_dir +  "/vertices_" + std::to_string(0) + ".csv";
     // terrain.WriteMeshVertices(vertices_filename);

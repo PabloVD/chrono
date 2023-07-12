@@ -47,9 +47,11 @@
 #include "chrono/physics/ChParticleCloud.h"
 #include "chrono/assets/ChSphereShape.h"
 
+// Pablo
 const int m_num_vehicles = 1;
-const int m_num_wheels = 4*m_num_vehicles;
-
+const int m_num_wheels_per_vehicle = 4;
+const int m_num_wheels = m_num_vehicles*m_num_wheels_per_vehicle;
+const int m_num_rocks = 6;
 
 namespace chrono {
 namespace vehicle {
@@ -108,6 +110,8 @@ class CH_VEHICLE_API SCMTerrain_Custom : public SCMTerrain {
     ~SCMTerrain_Custom() {}
 
     void EnterVehicle(std::shared_ptr<WheeledVehicle> vehicle, int id_vehicle);
+
+    void EnterRock(std::shared_ptr<ChBodyAuxRef> body, int id);
 
     /// Set the plane reference.
     /// By default, the reference plane is horizontal with Z up (ISO vehicle reference frame).
@@ -357,6 +361,8 @@ class CH_VEHICLE_API SCMLoader_Custom : public ChLoadContainer {
     ~SCMLoader_Custom() {}
 
     void EnterVehicle(std::shared_ptr<WheeledVehicle> vehicle, int id_vehicle);
+
+    void EnterRock(std::shared_ptr<ChBodyAuxRef> body, int id);
 
     /// Initialize the terrain system (flat).
     /// This version creates a flat array of points.
@@ -633,6 +639,7 @@ class CH_VEHICLE_API SCMLoader_Custom : public ChLoadContainer {
     //std::shared_ptr<chrono::vehicle::WheeledVehicle> m_vehicle;
     //std::array<std::shared_ptr<chrono::vehicle::WheeledVehicle>, m_num_vehicles> m_vehicles;
     std::array<std::shared_ptr<ChWheel>, m_num_wheels> m_wheels;
+    std::array<std::shared_ptr<ChBodyAuxRef>, m_num_rocks> m_rocks;
     ChVector<> m_box_size;
     ChVector<> m_box_offset;
     //std::shared_ptr<ChParticleCloud> m_particles;

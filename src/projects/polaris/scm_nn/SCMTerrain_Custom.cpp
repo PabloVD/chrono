@@ -59,6 +59,11 @@ void SCMTerrain_Custom::EnterVehicle(std::shared_ptr<WheeledVehicle> vehicle, in
     m_loader->EnterVehicle(vehicle, id_vehicle);
 }
 
+// Initialize the terrain as a flat grid.
+void SCMTerrain_Custom::EnterRock(std::shared_ptr<ChBodyAuxRef> body, int id) {
+    m_loader->EnterRock(body, id);
+}
+
 // Get the initial terrain height below the specified location.
 double SCMTerrain_Custom::GetInitHeight(const ChVector<>& loc) const {
     return m_loader->GetInitHeight(loc);
@@ -458,7 +463,8 @@ SCMLoader_Custom::SCMLoader_Custom(ChSystem* system, bool visualization_mesh, bo
     }
 
     // std::string NN_module_name = "wrapped_unet_cpu.pt";
-    std::string NN_module_name = "wrapped_unet_cuda.pt";
+    //std::string NN_module_name = "wrapped_unet_cuda.pt";
+    std::string NN_module_name = "wrapped_unet_cuda_wheels_"+std::to_string(m_num_wheels)+".pt";
     std::cout << "Using NN " << NN_module_name << std::endl;
     // gridsize = 16;
     gridsize = 12;
@@ -473,8 +479,10 @@ void SCMLoader_Custom::EnterVehicle(std::shared_ptr<WheeledVehicle> vehicle, int
 
     //m_vehicle = vehicle;
 
+    //std::cout << m_wheels.size() << std::endl;
+
     // Pablo
-    for (int i = 0; i < m_num_wheels/2; i++) {
+    for (int i = 0; i < m_num_wheels_per_vehicle/2; i++) {
         m_wheels[4*id_vehicle+2*i] = vehicle->GetWheel(i, LEFT);
         m_wheels[4*id_vehicle+2*i+1] = vehicle->GetWheel(i, RIGHT);
     }
@@ -489,6 +497,23 @@ void SCMLoader_Custom::EnterVehicle(std::shared_ptr<WheeledVehicle> vehicle, int
     m_box_offset = ChVector<>(0.0, 0.0, 0.0);
     //margin_factor = 1.;  // 1 when tire_radius * tire_radius * margin_factor
     margin_factor = 0.0;
+}
+
+void SCMLoader_Custom::EnterRock(std::shared_ptr<ChBodyAuxRef> body, int id) {
+
+    cout << id << endl;
+    m_rocks[id] = body;
+
+    // Set default size and offset of sampling box
+    // tire_radius = m_wheels[0]->GetTire()->GetRadius();
+    // tire_width = m_wheels[0]->GetTire()->GetWidth();
+    // cout << "Tire radius and width: " << tire_radius << ", " << tire_width << endl;
+    // m_box_size.x() = 1.1;
+    // m_box_size.y() = 1.1;
+    // m_box_size.z() = 2.2;
+    // m_box_offset = ChVector<>(0.0, 0.0, 0.0);
+    // //margin_factor = 1.;  // 1 when tire_radius * tire_radius * margin_factor
+    // margin_factor = 0.0;
 }
 
 // Initialize the terrain as a flat grid

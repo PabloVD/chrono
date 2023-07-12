@@ -115,13 +115,15 @@ double render_step_size=step_size;
 ChVector<> trackPoint(0.0, 0.0, 1.75);
 
 // Flag for printing time stats
-bool print_stats = true;
+bool print_stats = false;
 
 // Visualization output
 bool img_output = false;
 
 // Vertices output
 bool ver_output = false;
+
+const int num_polaris = m_num_vehicles;
 
 // =============================================================================
 
@@ -317,27 +319,44 @@ int main(int argc, char* argv[]) {
     // Create the Polaris vehicle
     // --------------------
 
-    cout << "Create vehicle..." << endl;
-    // Initial vehicle position and orientation
-    //ChCoordsys<> init_pos(ChVector<>(1.3, 0, 0.1), QUNIT);
+    std::array<std::shared_ptr<WheeledVehicle>,num_polaris> vehicle_list;
 
-    // First find height in the spawn point to ensure that the vehicle spawns above the floor
-    double init_x = 4.-terrainLength/2.0;
-    //double init_x = 0.;
-    ChVector<> initLoc0(init_x, 0, initheight);
-    double terrainheightspawn = terrain.GetHeight(initLoc0);
-    // cout << "Height terrain in spawn point: " << terrainheightspawn << endl;
+    for (int id = 0; id < num_polaris; id++) {
 
-    ChVector<> initLoc(init_x, 0, initheight + terrainheightspawn);
-    ChQuaternion<> initRot(1, 0, 0, 0); // Same than QUNIT
-    ChCoordsys<> init_pos(initLoc, initRot);
+        //int id=0;
 
-    cout << "Create vehicle..." << endl;
-    auto vehicle = CreateVehicle(sys, init_pos);
-    double x_max = (terrainLength/2.0 - 3.0);
-    double y_max = (terrainWidth/2.0 - 3.0);
+        cout << "Create vehicle..." << endl;
+        // Initial vehicle position and orientation
+        //ChCoordsys<> init_pos(ChVector<>(1.3, 0, 0.1), QUNIT);
 
-    terrain.EnterVehicle(vehicle,0);
+        // First find height in the spawn point to ensure that the vehicle spawns above the floor
+        double init_x = 4.-terrainLength/2.0;
+        //double init_x = 0.;
+        //double init_y = -2 + id*3;
+        double init_y = -7.5 + id*3;
+        ChVector<> initLoc0(init_x, init_y, initheight);
+        double terrainheightspawn = terrain.GetHeight(initLoc0);
+        // cout << "Height terrain in spawn point: " << terrainheightspawn << endl;
+
+        ChVector<> initLoc(init_x, init_y, initheight + terrainheightspawn);
+        ChQuaternion<> initRot(1, 0, 0, 0); // Same than QUNIT
+        ChCoordsys<> init_pos(initLoc, initRot);
+
+        cout << "here..." << endl;
+
+        auto vehicle = CreateVehicle(sys, init_pos);
+        double x_max = (terrainLength/2.0 - 3.0);
+        double y_max = (terrainWidth/2.0 - 3.0);
+
+        cout << "entervehicle..." << endl;
+
+        terrain.EnterVehicle(vehicle,id);
+
+        cout << "here..." << endl;
+
+        vehicle_list[id] = vehicle;
+
+    }
 
 
     // std::string vertices_filename = out_dir +  "/vertices_" + std::to_string(0) + ".csv";
@@ -353,13 +372,15 @@ int main(int argc, char* argv[]) {
     vis->AddLightDirectional();
     vis->AddSkyBox();
     vis->AddLogo();
-    vis->AttachVehicle(vehicle.get());
+    for (int id = 0; id < num_polaris; id++) {
+        vis->AttachVehicle(vehicle_list[id].get());
+    }
 
     // --------------------
     // Create driver system
     // --------------------
-    MyDriver driver(*vehicle, 0.5);
-    driver.Initialize();
+    // MyDriver driver(*vehicle_list[0], 0.5);
+    // driver.Initialize();
 
     // -----------------
     // Initialize output
@@ -375,17 +396,17 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    DataWriterVehicle data_writer(&sys, vehicle, terrain);
-    data_writer.SetVerbose(verbose);
-    data_writer.SetMBSOutput(wheel_output);
-    data_writer.Initialize(out_dir, output_major_fps, step_size);
+    // DataWriterVehicle data_writer(&sys, vehicle, terrain);
+    // data_writer.SetVerbose(verbose);
+    // data_writer.SetMBSOutput(wheel_output);
+    // data_writer.Initialize(out_dir, output_major_fps, step_size);
     cout << "Simulation output data saved in: " << out_dir << endl;
     cout << "===============================================================================" << endl;
 
     // ---------------
     // Simulation loop
     // ---------------
-    std::cout << "Total vehicle mass: " << vehicle->GetMass() << std::endl;
+    //std::cout << "Total vehicle mass: " << vehicle->GetMass() << std::endl;
 
 
     // Number of simulation steps between two 3D view render frames
@@ -428,8 +449,8 @@ int main(int argc, char* argv[]) {
 
         timer_vis.stop();
 
-        if (ver_output)
-            data_writer.Process(step_number, t);
+        // if (ver_output)
+        //     data_writer.Process(step_number, t);
         
         if (step_number % render_steps == 0) {
             if (ver_output)
@@ -458,13 +479,15 @@ int main(int argc, char* argv[]) {
         timer_sync.start();
 
         // // Driver inputs
-        DriverInputs driver_inputs = driver.GetInputs();
-        // DriverInputs driver_inputs = {0.0, 0.0, 0.0};
+        //DriverInputs driver_inputs = driver.GetInputs();
+        DriverInputs driver_inputs = {0.0, 1.0, 0.0};
 
         // // Update modules
-        driver.Synchronize(t);
+        //driver.Synchronize(t);
         terrain.Synchronize(t);
-        vehicle->Synchronize(t, driver_inputs, terrain);
+        for (int id = 0; id < num_polaris; id++) {
+            vehicle_list[id]->Synchronize(t, driver_inputs, terrain);
+        }
         vis->Synchronize(t, driver_inputs);
 
         timer_sync.stop();

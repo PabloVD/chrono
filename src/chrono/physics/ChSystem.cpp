@@ -1514,8 +1514,8 @@ bool ChSystem::Integrate_Y() {
     is_updated = true;
 
     // Pablo
-    std::cout << "Timer advance integrate Y (ms): " << 1e3 * timer_advance() << std::endl;
-    std::cout << "Timer total integrate Y (ms): " << 1e3 * timer_step() << std::endl;
+    //std::cout << "Timer advance integrate Y (ms): " << 1e3 * timer_advance() << std::endl;
+    //std::cout << "Timer total integrate Y (ms): " << 1e3 * timer_step() << std::endl;
 
     return true;
 }
