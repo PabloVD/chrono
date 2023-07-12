@@ -48,10 +48,11 @@
 #include "chrono/assets/ChSphereShape.h"
 
 // Pablo
-const int m_num_vehicles = 1;
+const int m_num_vehicles = 6;
 const int m_num_wheels_per_vehicle = 4;
 const int m_num_wheels = m_num_vehicles*m_num_wheels_per_vehicle;
-const int m_num_rocks = 6;
+const int m_num_rocks = 0;
+const int m_batchsize = m_num_wheels + m_num_rocks;
 
 namespace chrono {
 namespace vehicle {

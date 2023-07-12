@@ -284,20 +284,22 @@ int main(int argc, char* argv[]) {
         rockpath+"rock1.obj", rockpath+"rock1.obj",  //
         rockpath+"rock3.obj", rockpath+"rock3.obj"   //
     };
-    double rock_height = 0.5;
+    double rock_height = 0.1;
     double rock_sep = 0.5;
-    double rock_initx = -0.5;
+    double rock_initx = terrainLength/4.0-terrainLength/2.0;//-0.5;
     std::vector<ChVector<>> rock_pos = {
         ChVector<>(rock_initx, -rock_sep, rock_height), ChVector<>(rock_initx, rock_sep, rock_height), //
         ChVector<>(rock_initx+1.5, -rock_sep, rock_height), ChVector<>(rock_initx+1.5, rock_sep, rock_height), //
         ChVector<>(rock_initx+3, -rock_sep, rock_height), ChVector<>(rock_initx+3, rock_sep, rock_height) //
     };
     std::vector<double> rock_scale = {
-        0.8,  0.8,   //
+        //0.8,  0.8,   //
+        0.45, 0.45,  //
         0.45, 0.45,  //
         0.45, 0.45   //
     };
     double rock_density = 8000;
+    //double rock_density = 0.5*8000;
     std::shared_ptr<ChMaterialSurface> rock_mat = ChMaterialSurface::DefaultMaterial(sys.GetContactMethod());
 
     for (int i = 0; i < m_num_rocks; i++) {
@@ -420,15 +422,11 @@ int main(int argc, char* argv[]) {
 
     terrain.EnterVehicle(vehicle,0);
 
-    cout << "here1" << endl;
-
     if (use_rocks){
         for (int i = 0; i < m_num_rocks; i++) {
             terrain.EnterRock(rock[i],i);
     }
     }
-
-    cout << "here2" << endl;
     
 
     // std::string vertices_filename = out_dir +  "/vertices_" + std::to_string(0) + ".csv";

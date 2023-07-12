@@ -115,7 +115,7 @@ double render_step_size=step_size;
 ChVector<> trackPoint(0.0, 0.0, 1.75);
 
 // Flag for printing time stats
-bool print_stats = false;
+bool print_stats = true;
 
 // Visualization output
 bool img_output = false;

@@ -464,7 +464,7 @@ SCMLoader_Custom::SCMLoader_Custom(ChSystem* system, bool visualization_mesh, bo
 
     // std::string NN_module_name = "wrapped_unet_cpu.pt";
     //std::string NN_module_name = "wrapped_unet_cuda.pt";
-    std::string NN_module_name = "wrapped_unet_cuda_wheels_"+std::to_string(m_num_wheels)+".pt";
+    std::string NN_module_name = "wrapped_unet_cuda_batch_"+std::to_string(m_batchsize)+".pt";
     std::cout << "Using NN " << NN_module_name << std::endl;
     // gridsize = 16;
     gridsize = 12;
@@ -501,7 +501,7 @@ void SCMLoader_Custom::EnterVehicle(std::shared_ptr<WheeledVehicle> vehicle, int
 
 void SCMLoader_Custom::EnterRock(std::shared_ptr<ChBodyAuxRef> body, int id) {
 
-    cout << id << endl;
+    //cout << id << endl;
     m_rocks[id] = body;
 
     // Set default size and offset of sampling box
@@ -1257,10 +1257,14 @@ void SCMLoader_Custom::ComputeInternalForces() {
     // Prepare NN model inputs
     // const auto& p_all = m_particles->GetParticles();
     //std::vector<torch::jit::IValue> inputs;
+
+    //-----------------
+    // Wheels
+    //-----------------
     
     std::array<ChVector<float>, m_num_wheels> w_pos;
     std::array<ChQuaternion<float>, m_num_wheels> w_rot;
-    std::array<ChVector<float>, m_num_wheels> w_nrm;
+    //std::array<ChVector<float>, m_num_wheels> w_nrm;
     std::array<ChVector<float>, m_num_wheels> w_linvel;
     std::array<ChVector<float>, m_num_wheels> w_angvel;
     std::array<bool, m_num_wheels> w_contact;
@@ -1284,7 +1288,7 @@ void SCMLoader_Custom::ComputeInternalForces() {
         w_startindex[i].x() = static_cast<int>(std::round(w_pos[i].x()/m_delta))-gridsize/2;
         w_startindex[i].y() = static_cast<int>(std::round(w_pos[i].y()/m_delta))-gridsize/2;
         w_rot[i] = w_state.rot;
-        w_nrm[i] = w_state.rot.GetYaxis();
+        //w_nrm[i] = w_state.rot.GetYaxis();
         w_linvel[i] = w_state.lin_vel;
         w_angvel[i] = w_state.ang_vel;
 
@@ -1295,11 +1299,11 @@ void SCMLoader_Custom::ComputeInternalForces() {
         //auto tire_radius = m_wheels[i]->GetTire()->GetRadius();
 
         // Sampling OBB
-        ChVector<> Z_dir(0, 0, 1);
-        ChVector<> X_dir = Vcross(w_nrm[i], ChVector<>(0, 0, 1)).GetNormalized();
-        ChVector<> Y_dir = Vcross(Z_dir, X_dir);
-        ChMatrix33<> box_rot(X_dir, Y_dir, Z_dir);
-        ChVector<> box_pos = w_pos[i] + box_rot * (m_box_offset - ChVector<>(0, 0, tire_radius));
+        // ChVector<> Z_dir(0, 0, 1);
+        // ChVector<> X_dir = Vcross(w_nrm[i], ChVector<>(0, 0, 1)).GetNormalized();
+        // ChVector<> Y_dir = Vcross(Z_dir, X_dir);
+        // ChMatrix33<> box_rot(X_dir, Y_dir, Z_dir);
+        // ChVector<> box_pos = w_pos[i] + box_rot * (m_box_offset - ChVector<>(0, 0, tire_radius));
 
         // // Find particles in sampling OBB
         // m_wheel_particles[i].resize(p_all.size());
@@ -1382,9 +1386,186 @@ void SCMLoader_Custom::ComputeInternalForces() {
     }
 
     // Prepare the tuple input for this wheel
+    //glob_tensor = torch::cat({linvel_tensor, angvel_tensor},1);
+
+    //-----------------
+    // Rocks
+    //-----------------
+
+
+    std::array<ChVector<float>, m_num_rocks> r_pos;
+    std::array<ChQuaternion<float>, m_num_rocks> r_rot;
+    //std::array<ChVector<float>, m_num_wheels> w_nrm;
+    std::array<ChVector<float>, m_num_rocks> r_linvel;
+    std::array<ChVector<float>, m_num_rocks> r_angvel;
+    std::array<bool, m_num_rocks> r_contact;
+    std::array<ChContactable*, m_num_rocks> r_contactable;
+    std::array<ChVector2<int>, m_num_rocks> r_startindex;
+
+    if (m_num_rocks>0){
+
+    
+    
+    
+
+    torch::Tensor pos_tensor_r, wpos_tensor_r, quat_tensor_r, linvel_tensor_r, angvel_tensor_r, glob_tensor_r;
+    pos_tensor_r = torch::zeros({m_num_rocks*gridsize*gridsize, 4}, torch::kFloat32);
+    wpos_tensor_r = torch::zeros({m_num_rocks, 3}, torch::kFloat32);
+    quat_tensor_r = torch::zeros({m_num_rocks, 4}, torch::kFloat32);
+    linvel_tensor_r = torch::zeros({m_num_rocks, 3}, torch::kFloat32);
+    angvel_tensor_r = torch::zeros({m_num_rocks, 3}, torch::kFloat32);
+    glob_tensor_r = torch::zeros({m_num_rocks, 6}, torch::kFloat32);
+
+    ChQuaternion<> quat_provisional(1, 0, 0, 0);
+    ChVector<float> vel_provisional(0, 0, 0);
+
+    // Loop over all vehicle wheels
+    for (int i = 0; i < m_num_rocks; i++) {
+
+        // Wheel state
+        //const auto& r_state = m_rocks[i]->GetSystem();
+        r_pos[i] = m_rocks[i]->GetPos();//r_state->pos;
+        r_startindex[i].x() = static_cast<int>(std::round(r_pos[i].x()/m_delta))-gridsize/2;
+        r_startindex[i].y() = static_cast<int>(std::round(r_pos[i].y()/m_delta))-gridsize/2;
+        r_rot[i] = quat_provisional;
+        //w_nrm[i] = r_state.rot.GetYaxis();
+        r_linvel[i] = vel_provisional;
+        r_angvel[i] = vel_provisional;
+
+        r_contactable[i] = m_rocks[i]->GetCollisionModel()->GetContactable();
+
+        // std::cout << w_contactable[i] << ", " << w_pos[i] << ", " << w_rot[i] << w_linvel[i] << std::endl;
+
+        //auto tire_radius = m_wheels[i]->GetTire()->GetRadius();
+
+        // Sampling OBB
+        // ChVector<> Z_dir(0, 0, 1);
+        // ChVector<> X_dir = Vcross(w_nrm[i], ChVector<>(0, 0, 1)).GetNormalized();
+        // ChVector<> Y_dir = Vcross(Z_dir, X_dir);
+        // ChMatrix33<> box_rot(X_dir, Y_dir, Z_dir);
+        // ChVector<> box_pos = w_pos[i] + box_rot * (m_box_offset - ChVector<>(0, 0, tire_radius));
+
+        // // Find particles in sampling OBB
+        // m_wheel_particles[i].resize(p_all.size());
+        // auto end = std::copy_if(p_all.begin(), p_all.end(), m_wheel_particles[i].begin(),
+        //                         in_box(box_pos, box_rot, m_box_size));
+        // m_num_particles[i] = (size_t)(end - m_wheel_particles[i].begin());
+        // m_wheel_particles[i].resize(m_num_particles[i]);
+
+        // Do nothing if no particles under a wheel
+        // if (m_num_particles[i] == 0) {
+        //     return;
+        // }
+
+        // Torch part
+        // Load particle positions and velocities
+        r_contact[i] = false;
+        auto part_pos_r = torch::empty({(int)(gridsize*gridsize), 4}, torch::kFloat32);
+        float* part_pos_data_r = part_pos_r.data<float>();
+        for (int k=r_startindex[i].x();k<r_startindex[i].x()+gridsize;k++)
+        {
+          for (int l=r_startindex[i].y();l<r_startindex[i].y()+gridsize;l++)  
+          {
+
+            double x = k * m_delta;
+            double y = l * m_delta;
+            ChVector2<int> ij; 
+            ij.x() = k;
+            ij.y() = l;
+            double z = GetHeight(ij);
+
+            *part_pos_data_r++ = x;
+            *part_pos_data_r++ = y;
+            *part_pos_data_r++ = z;
+            
+            // Get sinkage
+            const ChVector<> loc(x,y,z);
+            const auto& initheight = GetInitHeight(loc);
+            //std::cout<<"initheight= "<<initheight<<std::endl;
+            *part_pos_data_r++ = initheight-z;
+
+            // if (!w_contact[i] && (p - w_pos[i]).Length2() < tire_radius * tire_radius * margin_factor)
+            //     w_contact[i] = true;
+          }
+        }
+            // std::cout << "part_pos.size()= "<< part_pos.size() << std::endl;
+
+        // Load wheel position, orientation, linear velocity, and angular velocity
+        auto r_pos_t = torch::from_blob((void*)r_pos[i].data(), {3}, torch::kFloat32);
+        auto r_rot_t = torch::from_blob((void*)r_rot[i].data(), {4}, torch::kFloat32);
+        auto r_linvel_t = torch::from_blob((void*)r_linvel[i].data(), {3}, torch::kFloat32);
+        auto r_angvel_t = torch::from_blob((void*)r_angvel[i].data(), {3}, torch::kFloat32);
+
+        pos_tensor_r.index({torch::indexing::Slice(i*gridsize*gridsize,(i+1)*gridsize*gridsize)}) = part_pos_r;
+        wpos_tensor_r[i] = r_pos_t;
+        quat_tensor_r[i] = r_rot_t;
+        linvel_tensor_r[i] = r_linvel_t;
+        angvel_tensor_r[i] = r_angvel_t;
+
+// #if 0
+//         if (true) {
+//             std::cout << "wheel " << i << std::endl;
+//             std::cout << "  num. particles: " << m_num_particles[i] << std::endl;
+//             std::cout << "  position:       " << w_pos[i] << std::endl;
+//             std::cout << "  pos. address:   " << w_pos[i].data() << std::endl;
+//             std::cout << "  in contact:     " << w_contact[i] << std::endl;
+//         }
+// #endif        
+
+        // Prepare the tuple input for this wheel
+        // std::vector<torch::jit::IValue> tuple;
+        // tuple.push_back(part_pos);
+        // tuple.push_back(w_pos_t);
+        // tuple.push_back(w_rot_t);
+        // tuple.push_back(w_linvel_t);
+        // tuple.push_back(w_angvel_t);
+
+        // // Add this wheel's tuple to NN model inputs
+        // inputs.push_back(torch::ivalue::Tuple::create(tuple));
+        // //std::cout << " num. particles: " << m_num_particles[i] << std::endl;
+    }
+
+    //---------
+    // NN inputs
+    //---------
+
+
+
+
+    pos_tensor = torch::cat({pos_tensor, pos_tensor_r},0);
+    wpos_tensor = torch::cat({wpos_tensor, wpos_tensor_r},0);
+    quat_tensor = torch::cat({quat_tensor, quat_tensor_r},0);
+    linvel_tensor = torch::cat({linvel_tensor, linvel_tensor_r},0);
+    angvel_tensor = torch::cat({angvel_tensor, angvel_tensor_r},0);
+
+    }
+
+    // std::cout << "Wheel Contactables:" << std::endl;
+    // for (int i=0; i< w_contactable.size();i++){
+    //     std::cout << w_contactable[i] << std::endl;
+    // }
+
+    std::array<ChContactable*, m_num_wheels+m_num_rocks> tot_contactable;
+    std::copy(w_contactable.begin(), w_contactable.end(), tot_contactable.begin());
+    std::copy(r_contactable.begin(), r_contactable.end(), tot_contactable.begin() + w_contactable.size());
+
+    std::array<ChVector<float>, m_num_wheels+m_num_rocks> tot_pos;
+    std::copy(w_pos.begin(), w_pos.end(), tot_pos.begin());
+    std::copy(r_pos.begin(), r_pos.end(), tot_pos.begin() + w_pos.size());
+
+    // std::cout << "Tot Contactables:" << std::endl;
+    // for (int i=0; i< tot_contactable.size();i++){
+    //     std::cout << tot_contactable[i] << std::endl;
+    // }
+
+    //std::cout << r_contactable << std::endl;
+
     glob_tensor = torch::cat({linvel_tensor, angvel_tensor},1);
 
-    //std::cout << pos_tensor.sizes() << glob_tensor.sizes() << std::endl;
+    //std::cout << "Sizes: " << pos_tensor.sizes() << " " << wpos_tensor.sizes() << " " << quat_tensor.sizes() << " " << glob_tensor.sizes() << std::endl;
+    //std::cout << wpos_tensor << std::endl;
+    //std::cout << glob_tensor << std::endl;
+
 
     std::vector<torch::jit::IValue> inputs;
     inputs.push_back(pos_tensor);
@@ -1433,6 +1614,8 @@ void SCMLoader_Custom::ComputeInternalForces() {
     //const auto& w_out = outputs.toTuple()->elements()[i].toTensor();
     const auto& w_out = outputs.toTensor();
 
+    //std::cout << "Outs: " << w_out.sizes() << std::endl;
+
 
      // For each node around the wheel
     //  m_particle_positions[i].resize(m_num_particles[i]);
@@ -1448,7 +1631,7 @@ void SCMLoader_Custom::ComputeInternalForces() {
         float pos_x = w_out[j][0].item<float>();
         float pos_y = w_out[j][1].item<float>();
         float def_z = w_out[j][2].item<float>();
-        int i = w_out[j][3].item<int>();
+        int ind = w_out[j][3].item<int>();
         // float pos_x = wpart[0].item<float>();
         // float pos_y = wpart[1].item<float>();
         // float def_z = wpart[2].item<float>();
@@ -1477,21 +1660,45 @@ void SCMLoader_Custom::ComputeInternalForces() {
         // // newhits.insert(std::make_pair(indexes, record));
         // t_hits[t_num].insert(std::make_pair(indexes, record));
 
-            
+        if (ind<m_num_wheels){
 
-        //if ((new_part_pos - w_pos[i]).Length2() <  tire_radius * tire_radius * margin_factor ){
-        if ((new_part_pos - w_pos[i]).Length2() <  std::pow(tire_radius + margin_factor, 2) ){
-            
-            HitRecord record = {w_contactable[i], new_part_pos, i};
-            //auto h = std::make_pair(indexes, record);
-            //newhits.insert(h);
-            t_hits[t_num].insert(std::make_pair(indexes, record));
+            //if ((new_part_pos - w_pos[i]).Length2() <  tire_radius * tire_radius * margin_factor ){
+            if ((new_part_pos - tot_pos[ind]).Length2() <  std::pow(tire_radius + margin_factor, 2) ){
+                
+                HitRecord record = {tot_contactable[ind], new_part_pos, ind};
+                //auto h = std::make_pair(indexes, record);
+                //newhits.insert(h);
+                t_hits[t_num].insert(std::make_pair(indexes, record));
 
-            // if (m_grid_map.find(h.first) == m_grid_map.end()) {
-            //         double z = GetInitHeight(h.first);
-            //         m_grid_map.insert(std::make_pair(h.first, NodeRecord(z, z, GetInitNormal(h.first))));
-            //     }
+                // if (m_grid_map.find(h.first) == m_grid_map.end()) {
+                //         double z = GetInitHeight(h.first);
+                //         m_grid_map.insert(std::make_pair(h.first, NodeRecord(z, z, GetInitNormal(h.first))));
+                //     }
+            }
+
         }
+        else{
+
+            //if ((new_part_pos - w_pos[i]).Length2() <  tire_radius * tire_radius * margin_factor ){
+            if ((new_part_pos - tot_pos[ind]).Length2() <  std::pow(tire_radius + 0.1, 2) ){
+                
+                HitRecord record = {tot_contactable[ind], new_part_pos, ind};
+                //auto h = std::make_pair(indexes, record);
+                //newhits.insert(h);
+                t_hits[t_num].insert(std::make_pair(indexes, record));
+
+                // if (m_grid_map.find(h.first) == m_grid_map.end()) {
+                //         double z = GetInitHeight(h.first);
+                //         m_grid_map.insert(std::make_pair(h.first, NodeRecord(z, z, GetInitNormal(h.first))));
+                //     }
+            }
+
+
+        }
+
+            
+
+        
        
         }
     //}
@@ -1788,6 +1995,8 @@ void SCMLoader_Custom::ComputeInternalForces() {
         ChContactable* contactable = h.second.contactable;
         const ChVector<>& hit_point_abs = h.second.abs_point;
         int patch_id = h.second.patch_id;
+
+        //std::cout << patch_id << std::endl;
         
         //numhits[patch_id]++;
 
