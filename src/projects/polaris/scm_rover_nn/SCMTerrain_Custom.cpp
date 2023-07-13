@@ -470,6 +470,7 @@ SCMLoader_Custom::SCMLoader_Custom(ChSystem* system, bool visualization_mesh, bo
     std::cout << "Using NN " << NN_module_name << std::endl;
     // gridsize = 16;
     gridsize = 12;
+    // gridsize = 10;
     
     Load(vehicle::GetDataFile(m_terrain_dir + NN_module_name));
     // Create(m_terrain_dir,true);
@@ -1688,7 +1689,7 @@ void SCMLoader_Custom::ComputeInternalForces() {
         else{
 
             //if ((new_part_pos - w_pos[i]).Length2() <  tire_radius * tire_radius * margin_factor ){
-            if ((new_part_pos - tot_pos[ind]).Length2() <  std::pow(tire_radius , 2) ){
+            if ((new_part_pos - tot_pos[ind]).Length2() <  std::pow(tire_radius, 2) ){
                 
                 HitRecord record = {tot_contactable[ind], new_part_pos, ind};
                 //auto h = std::make_pair(indexes, record);

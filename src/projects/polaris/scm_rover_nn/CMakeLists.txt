@@ -39,7 +39,6 @@ endif()
 
 set(PROGRAMS 
     test_Rover_SCM_CustomTerrain
-    rovertest
     )
     
 set(UTILITIES

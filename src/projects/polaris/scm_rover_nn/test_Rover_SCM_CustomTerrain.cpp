@@ -49,6 +49,8 @@
 #include "DataWriter.h"
 #include "CreateObjects.h"
 
+#include "chrono/assets/ChTriangleMeshShape.h"
+#include "chrono/physics/ChInertiaUtils.h"
 using namespace chrono;
 using namespace chrono::collision;
 using namespace chrono::irrlicht;
@@ -68,6 +70,7 @@ using std::endl;
 
 // torch::Tensor tensor = torch::eye(3);
 // std::cout << tensor << std::endl;
+
 
 bool GetProblemSpecs(int argc,
                      char** argv,
@@ -130,6 +133,8 @@ bool img_output = false;
 
 // Vertices output
 bool ver_output = false;
+
+bool use_rocks = false;
 
 // =============================================================================
 // Rover stuff
@@ -239,7 +244,7 @@ int main(int argc, char* argv[]) {
     double output_major_fps = 1.0/render_step_size;
 
     // Output directories
-    std::string out_dir = GetChronoOutputPath() + "POLARIS_SCM";
+    std::string out_dir = GetChronoOutputPath() + "ROVER_SCM_ROCKS";
     
     if (use_nn){
         out_dir +=  "_nn";
@@ -277,6 +282,82 @@ int main(int argc, char* argv[]) {
     sys.SetNumThreads(std::min(8, ChOMP::GetNumProcs()));
     const ChVector<> gravity(0, 0, -9.81);
     sys.Set_G_acc(gravity);
+
+
+    // --------------------
+    // Create obstacles
+    // --------------------
+    
+    //if (use_rocks){
+
+    std::vector<std::shared_ptr<ChBodyAuxRef>> rock;
+
+    //std::string rockpath = "/home/tda/CARLA/chrono_scm_newcode/build_cuda/data/vehicle/terrain/scm/rocks/";
+    std::string rockpath = "robot/curiosity/rocks/";
+    //std::string rockpath = "terrain/scm/rocks/";
+    
+    std::vector<std::string> rock_meshfile = {
+        rockpath+"rock1.obj", rockpath+"rock1.obj",  //
+        rockpath+"rock1.obj", rockpath+"rock1.obj",  //
+        rockpath+"rock3.obj", rockpath+"rock3.obj"   //
+    };
+    double rock_height = 0.1;
+    double rock_sep = 0.5;
+    double rock_initx = terrainLength/4.0-terrainLength/2.0;//-0.5;
+    std::vector<ChVector<>> rock_pos = {
+        ChVector<>(rock_initx, -rock_sep, rock_height), ChVector<>(rock_initx, rock_sep, rock_height), //
+        ChVector<>(rock_initx+1.5, -rock_sep, rock_height), ChVector<>(rock_initx+1.5, rock_sep, rock_height), //
+        ChVector<>(rock_initx+3, -rock_sep, rock_height), ChVector<>(rock_initx+3, rock_sep, rock_height) //
+    };
+    std::vector<double> rock_scale = {
+        //0.8,  0.8,   //
+        0.45, 0.45,  //
+        0.45, 0.45,  //
+        0.45, 0.45   //
+    };
+    double rock_density = 8000;
+    //double rock_density = 0.5*8000;
+    std::shared_ptr<ChMaterialSurface> rock_mat = ChMaterialSurface::DefaultMaterial(sys.GetContactMethod());
+
+    for (int i = 0; i < m_num_rocks; i++) {
+        //std::cout << "Reading from " << GetChronoDataFile(rock_meshfile[i]) << std::endl;
+        auto mesh = ChTriangleMeshConnected::CreateFromWavefrontFile(GetChronoDataFile(rock_meshfile[i]), false, true);
+        mesh->Transform(ChVector<>(0, 0, 0), ChMatrix33<>(rock_scale[i]));
+        mesh->Transform(ChVector<>(0, 0, 0), Q_from_AngX(-CH_C_PI_2));
+        
+
+        double mass;
+        ChVector<> cog;
+        ChMatrix33<> inertia;
+        mesh->ComputeMassProperties(true, mass, cog, inertia);
+        ChMatrix33<> principal_inertia_rot;
+        ChVector<> principal_I;
+        ChInertiaUtils::PrincipalInertia(inertia, principal_I, principal_inertia_rot);
+
+        auto body = chrono_types::make_shared<ChBodyAuxRef>();
+        sys.Add(body);
+        body->SetBodyFixed(false);
+        body->SetFrame_REF_to_abs(ChFrame<>(ChVector<>(rock_pos[i]), QUNIT));
+        body->SetFrame_COG_to_REF(ChFrame<>(cog, principal_inertia_rot));
+        body->SetMass(mass * rock_density);
+        body->SetInertiaXX(rock_density * principal_I);
+
+        body->GetCollisionModel()->ClearModel();
+        body->GetCollisionModel()->AddTriangleMesh(rock_mat, mesh, false, false, VNULL, ChMatrix33<>(1),
+                                                   0.005);
+        body->GetCollisionModel()->BuildModel();
+        body->SetCollide(true);
+
+        auto mesh_shape = chrono_types::make_shared<ChTriangleMeshShape>();
+        mesh_shape->SetMesh(mesh);
+        mesh_shape->SetBackfaceCull(true);
+        body->AddVisualShape(mesh_shape);
+
+        rock.push_back(body);
+    }
+    //}
+
+    cout << rock.size() << endl;
 
 
     // ------------------
@@ -333,9 +414,10 @@ int main(int argc, char* argv[]) {
     }
 
     // --------------------
-    // Create the Polaris vehicle
+    // Create the Rover vehicle
     // --------------------
 
+    cout << "Create vehicle..." << endl;
     // Initial vehicle position and orientation
     //ChCoordsys<> init_pos(ChVector<>(1.3, 0, 0.1), QUNIT);
 
@@ -350,7 +432,6 @@ int main(int argc, char* argv[]) {
     ChQuaternion<> initRot(1, 0, 0, 0); // Same than QUNIT
     ChCoordsys<> init_pos(initLoc, initRot);
 
-    cout << "Create vehicle..." << endl;
     //auto vehicle = CreateVehicle(sys, init_pos);
     std::shared_ptr<Curiosity> vehicle = chrono_types::make_shared<Curiosity>(&sys, chassis_type, wheel_type);
     
@@ -364,6 +445,13 @@ int main(int argc, char* argv[]) {
     double y_max = (terrainWidth/2.0 - 3.0);
 
     terrain.EnterVehicle(vehicle, 0);
+
+    if (use_rocks){
+        for (int i = 0; i < m_num_rocks; i++) {
+            terrain.EnterRock(rock[i],i);
+    }
+    }
+    
 
     // std::string vertices_filename = out_dir +  "/vertices_" + std::to_string(0) + ".csv";
     // terrain.WriteMeshVertices(vertices_filename);
