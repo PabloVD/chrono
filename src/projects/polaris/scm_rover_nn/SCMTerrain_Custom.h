@@ -50,7 +50,12 @@
 #include "chrono_models/robot/curiosity/Curiosity.h"
 using namespace chrono::curiosity;
 
-const int m_num_wheels = 6;
+// Pablo
+const int m_num_vehicles = 1;
+const int m_num_wheels_per_vehicle = 6;
+const int m_num_wheels = m_num_vehicles*m_num_wheels_per_vehicle;
+const int m_num_rocks = 0;
+const int m_batchsize = m_num_wheels + m_num_rocks;
 
 namespace chrono {
 namespace vehicle {
@@ -108,7 +113,9 @@ class CH_VEHICLE_API SCMTerrain_Custom : public SCMTerrain {
 
     ~SCMTerrain_Custom() {}
 
-    void EnterVehicle(std::shared_ptr<Curiosity> vehicle);
+    void EnterVehicle(std::shared_ptr<Curiosity> vehicle, int id_vehicle);
+
+    void EnterRock(std::shared_ptr<ChBodyAuxRef> body, int id);
 
     /// Set the plane reference.
     /// By default, the reference plane is horizontal with Z up (ISO vehicle reference frame).
@@ -357,7 +364,9 @@ class CH_VEHICLE_API SCMLoader_Custom : public ChLoadContainer {
     SCMLoader_Custom(ChSystem* system, bool visualization_mesh, bool use_nn, int num_wheels);
     ~SCMLoader_Custom() {}
 
-    void EnterVehicle(std::shared_ptr<Curiosity> vehicle);
+    void EnterVehicle(std::shared_ptr<Curiosity> vehicle, int id_vehicle);
+
+    void EnterRock(std::shared_ptr<ChBodyAuxRef> body, int id);
 
     /// Initialize the terrain system (flat).
     /// This version creates a flat array of points.
@@ -384,7 +393,7 @@ class CH_VEHICLE_API SCMLoader_Custom : public ChLoadContainer {
 
     bool Load(const std::string& pt_file);
     // Pablo
-    void Create(const std::string& terrain_dir, bool vis = true);
+    //void Create(const std::string& terrain_dir, bool vis = true);
 
   private:
 
@@ -615,7 +624,6 @@ class CH_VEHICLE_API SCMLoader_Custom : public ChLoadContainer {
     ChTimer m_timer_preprocess;
     ChTimer m_timer_nn;
     ChTimer m_timer_postprocess;
-    ChTimer m_timer_postprocess2;
     ChTimer m_timer_contact_forces;
     ChTimer m_timer_bulldozing;
     ChTimer m_timer_bulldozing_boundary;
@@ -633,16 +641,15 @@ class CH_VEHICLE_API SCMLoader_Custom : public ChLoadContainer {
     // Pablo
     ChSystem* m_sys;
     //std::shared_ptr<chrono::vehicle::WheeledVehicle> m_vehicle;
-    std::shared_ptr<Curiosity> m_vehicle;
-    std::array<std::shared_ptr<ChWheel>, m_num_wheels> m_wheels;
+    //std::shared_ptr<Curiosity> m_vehicle;
+    std::array<std::shared_ptr<CuriosityWheel>, m_num_wheels> m_wheels;
+    std::array<std::shared_ptr<ChBodyAuxRef>, m_num_rocks> m_rocks;
     ChVector<> m_box_size;
     ChVector<> m_box_offset;
-    std::shared_ptr<ChParticleCloud> m_particles;
-    std::array<std::vector<ChAparticle*>, m_num_wheels> m_wheel_particles;
-    std::array<size_t, m_num_wheels> m_num_particles;
+    //std::shared_ptr<ChParticleCloud> m_particles;
+
     torch::jit::script::Module m_module;
-    std::array<std::vector<ChVector<>>, m_num_wheels> m_particle_positions;
-    std::array<TerrainForce, m_num_wheels> m_tire_forces;
+
     bool m_verbose;
     double tire_radius;
     double tire_width;

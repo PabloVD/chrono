@@ -33,7 +33,9 @@
 #include "SCMTerrain_Custom.h"
 #include "chrono_vehicle/terrain/RigidTerrain.h"
 //#include "chrono_vehicle/wheeled_vehicle/utils/ChWheeledVehicleVisualSystemIrrlicht.h"
-#include "chrono_vehicle/wheeled_vehicle/ChWheeledVehicleVisualSystemIrrlicht.h"
+//#include "chrono_vehicle/wheeled_vehicle/ChWheeledVehicleVisualSystemIrrlicht.h"
+#include "chrono/assets/ChVisualSystem.h"
+#include "chrono_irrlicht/ChVisualSystemIrrlicht.h"
 
 #include "chrono_models/vehicle/hmmwv/HMMWV.h"
 
@@ -84,10 +86,10 @@ double tend = 0.5;
 
 // double terrainLength = 8.0;  // size in X direction
 // double terrainWidth = 3.0;    // size in Y direction
-// double terrainLength = 15.0;  // size in X direction
-// double terrainWidth = 3.0;    // size in Y direction
-double terrainLength = 35.0;  // size in X direction
-double terrainWidth = 17.5;    // size in Y direction
+double terrainLength = 20.0;  // size in X direction
+double terrainWidth = 5.0;    // size in Y direction
+// double terrainLength = 35.0;  // size in X direction
+// double terrainWidth = 17.5;    // size in Y direction
 // double terrainLength = 100.0;  // size in X direction
 // double terrainWidth = 6.0;    // size in Y direction
 // double terrainLength = 70.0;  // size in X direction
@@ -111,7 +113,7 @@ bool use_nn = 0;
 // -----------------------------------------------------------------------------
 
 // Simulation step size
-double step_size = 2e-3;
+double step_size = 5e-4;
 
 // Time interval between two render frames (1/FPS)
 // double render_step_size = 2.0 / 100;
@@ -351,20 +353,17 @@ int main(int argc, char* argv[]) {
     cout << "Create vehicle..." << endl;
     //auto vehicle = CreateVehicle(sys, init_pos);
     std::shared_ptr<Curiosity> vehicle = chrono_types::make_shared<Curiosity>(&sys, chassis_type, wheel_type);
-    cout << "Llega hasta aqui" << endl;
+    
     //Curiosity rover(&sys, chassis_type, wheel_type);
     vehicle->SetDriver(chrono_types::make_shared<CuriositySpeedDriver>(1.0, CH_C_PI));
     //vehicle.Initialize(ChFrame<>(ChVector<>(-5, -0.2, 0), Q_from_AngX(-CH_C_PI / 2)));
-    cout << "Llega hasta aqui" << endl;
+    
     vehicle->Initialize(ChFrame<>(initLoc, initRot));
     //std::shared_ptr<Curiosity> vehicle = std::make_shared<Curiosity>(rover);
     double x_max = (terrainLength/2.0 - 3.0);
     double y_max = (terrainWidth/2.0 - 3.0);
 
-    terrain.EnterVehicle(vehicle);
-
-
-    cout << "Llega hasta aqui" << endl;
+    terrain.EnterVehicle(vehicle, 0);
 
     // std::string vertices_filename = out_dir +  "/vertices_" + std::to_string(0) + ".csv";
     // terrain.WriteMeshVertices(vertices_filename);
@@ -372,13 +371,21 @@ int main(int argc, char* argv[]) {
     // ---------------------------------------
     // Create the vehicle Irrlicht application
     // ---------------------------------------
-    auto vis = chrono_types::make_shared<ChWheeledVehicleVisualSystemIrrlicht>();
+    auto vis = chrono_types::make_shared<ChVisualSystemIrrlicht>();
     vis->SetWindowTitle("Rover SCM");
-    vis->SetChaseCamera(trackPoint, 6.0, 0.5);
+    vis->SetCameraVertical(CameraVerticalDir::Z);
+    vis->SetWindowSize(800, 600);
+    //vis->SetChaseCamera(trackPoint, 6.0, 0.5);
+    vis->AttachSystem(&sys);
     vis->Initialize();
-    vis->AddLightDirectional();
+    //vis->AddLightDirectional();
     vis->AddSkyBox();
     vis->AddLogo();
+    vis->AddCamera(ChVector<>(-1.0, 1.0, 3.0), ChVector<>(-5.0, 0.0, 0.0));
+    vis->AddTypicalLights();
+    vis->AddLightWithShadow(ChVector<>(-5.0, 8.0, -0.5), ChVector<>(-1, 0, 0), 100, 1, 35, 85, 512, ChColor(0.8f, 0.8f, 0.8f));
+    vis->EnableShadows();
+    
     //vis->AttachVehicle(vehicle.get());
     //vis->AttachVehicle(vehicle);
 
@@ -430,6 +437,8 @@ int main(int argc, char* argv[]) {
 
     while (vis->Run()) {
 
+        cout << endl << "Time: " << t << endl;
+
         timer_sync.reset();
         timer_vis.reset();
         timer_advance.reset();
@@ -447,7 +456,7 @@ int main(int argc, char* argv[]) {
         timer_vis.start();
 
         // Render scene
-        vis->Run();
+        //vis->Run();
         vis->BeginScene();
         vis->Render();
         tools::drawColorbar(vis.get(), 0, 0.1, "Sinkage", 30);
@@ -492,14 +501,14 @@ int main(int argc, char* argv[]) {
         //driver.Synchronize(t);
         terrain.Synchronize(t);
         //vehicle->Synchronize(t, driver_inputs, terrain);
-        vis->Synchronize(t, driver_inputs);
+        //vis->Synchronize(t, driver_inputs);
 
         timer_sync.stop();
         timer_advance.start();
 
         // Advance dynamics
         sys.DoStepDynamics(step_size);
-        vis->Advance(step_size);
+        //vis->Advance(step_size);
         t += step_size;
 
         timer_advance.stop();

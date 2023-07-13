@@ -1065,10 +1065,10 @@ void SCMLoader_Custom::UpdateFixedPatch(MovingPatchInfo& p) {
     ChVector<> aabb_min;
     ChVector<> aabb_max;
     GetSystem()->GetCollisionSystem()->GetBoundingBox(aabb_min, aabb_max);
-    aabb_min.x()-=0.35;
-    aabb_min.y()-=0.35;
-    aabb_max.x()+=0.35;
-    aabb_max.y()+=0.35;
+    // aabb_min.x()-=0.35;
+    // aabb_min.y()-=0.35;
+    // aabb_max.x()+=0.35;
+    // aabb_max.y()+=0.35;
 
     // Loop over all corners of the AABB
     for (int j = 0; j < 8; j++) {
@@ -1321,7 +1321,7 @@ void SCMLoader_Custom::ComputeInternalForces() {
         // Load particle positions and velocities
         w_contact[i] = false;
         auto part_pos = torch::empty({(int)(gridsize*gridsize), 4}, torch::kFloat32);
-        float* part_pos_data = part_pos.data<float>();
+        float* part_pos_data = part_pos.data_ptr<float>();
         for (int k=w_startindex[i].x();k<w_startindex[i].x()+gridsize;k++)
         {
           for (int l=w_startindex[i].y();l<w_startindex[i].y()+gridsize;l++)  
@@ -1461,7 +1461,7 @@ void SCMLoader_Custom::ComputeInternalForces() {
         // Load particle positions and velocities
         r_contact[i] = false;
         auto part_pos_r = torch::empty({(int)(gridsize*gridsize), 4}, torch::kFloat32);
-        float* part_pos_data_r = part_pos_r.data<float>();
+        float* part_pos_data_r = part_pos_r.data_ptr<float>();
         for (int k=r_startindex[i].x();k<r_startindex[i].x()+gridsize;k++)
         {
           for (int l=r_startindex[i].y();l<r_startindex[i].y()+gridsize;l++)  
@@ -1680,7 +1680,7 @@ void SCMLoader_Custom::ComputeInternalForces() {
         else{
 
             //if ((new_part_pos - w_pos[i]).Length2() <  tire_radius * tire_radius * margin_factor ){
-            if ((new_part_pos - tot_pos[ind]).Length2() <  std::pow(tire_radius + 0.1, 2) ){
+            if ((new_part_pos - tot_pos[ind]).Length2() <  std::pow(tire_radius, 2) ){
                 
                 HitRecord record = {tot_contactable[ind], new_part_pos, ind};
                 //auto h = std::make_pair(indexes, record);
