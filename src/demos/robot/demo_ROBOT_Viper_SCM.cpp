@@ -291,7 +291,7 @@ int main(int argc, char* argv[]) {
 
         sys.DoStepDynamics(5e-4);
         viper.Update();
-        ////terrain.PrintStepStatistics(std::cout);
+        terrain.PrintStepStatistics(std::cout);
     }
 
     if (output) {

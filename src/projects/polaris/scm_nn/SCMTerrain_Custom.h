@@ -48,7 +48,7 @@
 #include "chrono/assets/ChSphereShape.h"
 
 // Pablo
-const int m_num_vehicles = 6;
+const int m_num_vehicles = 1;
 const int m_num_wheels_per_vehicle = 4;
 const int m_num_wheels = m_num_vehicles*m_num_wheels_per_vehicle;
 const int m_num_rocks = 0;
@@ -646,6 +646,8 @@ class CH_VEHICLE_API SCMLoader_Custom : public ChLoadContainer {
     //std::shared_ptr<ChParticleCloud> m_particles;
     
     torch::jit::script::Module m_module;
+
+    torch::Tensor pos_tensor, wpos_tensor, quat_tensor, linvel_tensor, angvel_tensor, glob_tensor;    
     
     bool m_verbose;
     double tire_radius;

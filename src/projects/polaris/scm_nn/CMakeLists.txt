@@ -12,6 +12,8 @@ set(LINKER_FLAGS "${CH_LINKERFLAG_EXE}")
 set(LIBRARIES ChronoEngine ChronoEngine_irrlicht ChronoEngine_vehicle ChronoEngine_vehicle_irrlicht ChronoModels_vehicle)
 list(APPEND LIBS "")
 
+ set(CMAKE_CUDA_COMPILER "/usr/local/cuda/bin/nvcc")
+
 if(ENABLE_MODULE_OPENGL)
   include_directories(${CH_OPENGL_INCLUDES})
   list(APPEND LIBRARIES "ChronoEngine_opengl")

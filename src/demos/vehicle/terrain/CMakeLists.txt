@@ -18,6 +18,7 @@ endif()
 if(ENABLE_MODULE_IRRLICHT)
     set(DEMOS ${DEMOS}  
         demo_VEH_SCMTerrain_TrackedVehicle
+        demo_VEH_SCMTerrain_TrackedVehicle_mod
         demo_VEH_SCMTerrain_RigidTire
     )
 endif()

@@ -86,7 +86,10 @@ double terrainWidth = 17.5;    // size in Y direction
 // double terrainWidth = 6.0;    // size in Y direction
 // double terrainLength = 70.0;  // size in X direction
 // double terrainWidth = 10.0;    // size in Y direction
+
 double delta = 0.05;          // SCM grid spacing
+//double delta = 0.01;          // SCM grid spacing
+
 
 double throttle=0.;
 double steering=0.;

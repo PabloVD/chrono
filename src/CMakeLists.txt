@@ -4,7 +4,7 @@
 #
 #=============================================================================
 
-set(CMAKE_CUDA_COMPILER "/usr/local/cuda/bin/nvcc")
+#set(CMAKE_CUDA_COMPILER "/usr/local/cuda/bin/nvcc")
 #add_compile_definitions(_GLIBCXX_USE_CXX11_ABI=0)
 
 #-----------------------------------------------------------------------------
@@ -355,6 +355,9 @@ if(CUDA_FOUND)
   list(APPEND CUDA_NVCC_FLAGS ${NVCC_FLAGS_EXTRA})
 
   message(STATUS "  CUDA compile flags:   ${CUDA_NVCC_FLAGS}")
+  
+  # Pablo
+  set(CMAKE_CUDA_COMPILER "/usr/local/cuda/bin/nvcc")
 
 endif()
 

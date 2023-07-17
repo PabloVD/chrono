@@ -38,6 +38,8 @@
 
 #include "chrono_thirdparty/stb/stb.h"
 
+#include "nvToolsExt.h"
+
 
 using std::cout;
 using std::endl;
@@ -468,6 +470,7 @@ SCMLoader_Custom::SCMLoader_Custom(ChSystem* system, bool visualization_mesh, bo
     std::cout << "Using NN " << NN_module_name << std::endl;
     // gridsize = 16;
     gridsize = 12;
+    //gridsize = 12*4;
     
     Load(vehicle::GetDataFile(m_terrain_dir + NN_module_name));
     // Create(m_terrain_dir,true);
@@ -497,6 +500,14 @@ void SCMLoader_Custom::EnterVehicle(std::shared_ptr<WheeledVehicle> vehicle, int
     m_box_offset = ChVector<>(0.0, 0.0, 0.0);
     //margin_factor = 1.;  // 1 when tire_radius * tire_radius * margin_factor
     margin_factor = 0.0;
+
+    auto tensoroptions = torch::TensorOptions().dtype(torch::kFloat32);//.device(torch::kCUDA);
+    pos_tensor = torch::zeros({m_num_wheels*gridsize*gridsize, 4}, tensoroptions);
+    wpos_tensor = torch::zeros({m_num_wheels, 3}, tensoroptions);
+    quat_tensor = torch::zeros({m_num_wheels, 4}, tensoroptions);
+    linvel_tensor = torch::zeros({m_num_wheels, 3}, tensoroptions);
+    angvel_tensor = torch::zeros({m_num_wheels, 3}, tensoroptions);
+    glob_tensor = torch::zeros({m_num_wheels, 6}, tensoroptions);
 }
 
 void SCMLoader_Custom::EnterRock(std::shared_ptr<ChBodyAuxRef> body, int id) {
@@ -1248,6 +1259,7 @@ void SCMLoader_Custom::ComputeInternalForces() {
 
     if (m_use_nn){
 
+    nvtxRangePushA("Preprocess NN");
     m_timer_preprocess.start();
 
     // Create(m_terrain_dir,true);
@@ -1271,13 +1283,19 @@ void SCMLoader_Custom::ComputeInternalForces() {
     std::array<ChContactable*, m_num_wheels> w_contactable;
     std::array<ChVector2<int>, m_num_wheels> w_startindex;
 
-    torch::Tensor pos_tensor, wpos_tensor, quat_tensor, linvel_tensor, angvel_tensor, glob_tensor;
-    pos_tensor = torch::zeros({m_num_wheels*gridsize*gridsize, 4}, torch::kFloat32);
-    wpos_tensor = torch::zeros({m_num_wheels, 3}, torch::kFloat32);
-    quat_tensor = torch::zeros({m_num_wheels, 4}, torch::kFloat32);
-    linvel_tensor = torch::zeros({m_num_wheels, 3}, torch::kFloat32);
-    angvel_tensor = torch::zeros({m_num_wheels, 3}, torch::kFloat32);
-    glob_tensor = torch::zeros({m_num_wheels, 6}, torch::kFloat32);
+
+    //nvtxRangePushA("Define CUDA tensors");
+
+    // auto tensoroptions = torch::TensorOptions().dtype(torch::kFloat32).device(torch::kCUDA);
+    // torch::Tensor pos_tensor, wpos_tensor, quat_tensor, linvel_tensor, angvel_tensor, glob_tensor;
+    // pos_tensor = torch::zeros({m_num_wheels*gridsize*gridsize, 4}, tensoroptions);
+    // wpos_tensor = torch::zeros({m_num_wheels, 3}, tensoroptions);
+    // quat_tensor = torch::zeros({m_num_wheels, 4}, tensoroptions);
+    // linvel_tensor = torch::zeros({m_num_wheels, 3}, tensoroptions);
+    // angvel_tensor = torch::zeros({m_num_wheels, 3}, tensoroptions);
+    // glob_tensor = torch::zeros({m_num_wheels, 6}, tensoroptions);
+
+    //nvtxRangePop();
 
     // Loop over all vehicle wheels
     for (int i = 0; i < m_num_wheels; i++) {
@@ -1350,13 +1368,15 @@ void SCMLoader_Custom::ComputeInternalForces() {
         }
             // std::cout << "part_pos.size()= "<< part_pos.size() << std::endl;
 
+        //nvtxRangePushA("Move to CUDA");
         // Load wheel position, orientation, linear velocity, and angular velocity
-        auto w_pos_t = torch::from_blob((void*)w_pos[i].data(), {3}, torch::kFloat32);
-        auto w_rot_t = torch::from_blob((void*)w_rot[i].data(), {4}, torch::kFloat32);
-        auto w_linvel_t = torch::from_blob((void*)w_linvel[i].data(), {3}, torch::kFloat32);
-        auto w_angvel_t = torch::from_blob((void*)w_angvel[i].data(), {3}, torch::kFloat32);
+        auto w_pos_t = torch::from_blob((void*)w_pos[i].data(), {3});//.to(torch::kCUDA);//, tensoroptions);
+        auto w_rot_t = torch::from_blob((void*)w_rot[i].data(), {4});//.to(torch::kCUDA);//, tensoroptions);
+        auto w_linvel_t = torch::from_blob((void*)w_linvel[i].data(), {3});//.to(torch::kCUDA);//, tensoroptions);
+        auto w_angvel_t = torch::from_blob((void*)w_angvel[i].data(), {3});//.to(torch::kCUDA);//, tensoroptions);
+        //nvtxRangePop();
 
-        pos_tensor.index({torch::indexing::Slice(i*gridsize*gridsize,(i+1)*gridsize*gridsize)}) = part_pos;
+        pos_tensor.index({torch::indexing::Slice(i*gridsize*gridsize,(i+1)*gridsize*gridsize)}) = part_pos;//.to(torch::kCUDA);
         wpos_tensor[i] = w_pos_t;
         quat_tensor[i] = w_rot_t;
         linvel_tensor[i] = w_linvel_t;
@@ -1408,13 +1428,13 @@ void SCMLoader_Custom::ComputeInternalForces() {
     
     
 
-    torch::Tensor pos_tensor_r, wpos_tensor_r, quat_tensor_r, linvel_tensor_r, angvel_tensor_r, glob_tensor_r;
+    torch::Tensor pos_tensor_r, wpos_tensor_r, quat_tensor_r, linvel_tensor_r, angvel_tensor_r;//, glob_tensor_r;
     pos_tensor_r = torch::zeros({m_num_rocks*gridsize*gridsize, 4}, torch::kFloat32);
     wpos_tensor_r = torch::zeros({m_num_rocks, 3}, torch::kFloat32);
     quat_tensor_r = torch::zeros({m_num_rocks, 4}, torch::kFloat32);
     linvel_tensor_r = torch::zeros({m_num_rocks, 3}, torch::kFloat32);
     angvel_tensor_r = torch::zeros({m_num_rocks, 3}, torch::kFloat32);
-    glob_tensor_r = torch::zeros({m_num_rocks, 6}, torch::kFloat32);
+    //glob_tensor_r = torch::zeros({m_num_rocks, 6}, torch::kFloat32);
 
     ChQuaternion<> quat_provisional(1, 0, 0, 0);
     ChVector<float> vel_provisional(0, 0, 0);
@@ -1580,7 +1600,9 @@ void SCMLoader_Custom::ComputeInternalForces() {
     // inputs.push_back(m_verbose);
 
     m_timer_preprocess.stop();
+    nvtxRangePop();
 
+    //nvtxRangePushA("Forward NN");
     m_timer_nn.start();
 
     // //m_timer_model_eval.start();
@@ -1596,14 +1618,16 @@ void SCMLoader_Custom::ComputeInternalForces() {
     }
 
     m_timer_nn.stop();
+    //nvtxRangePop();
 
+    nvtxRangePushA("Postprocess NN");
     m_timer_postprocess.start();
 
     // cout << "Numparts: " << m_num_particles[0] + m_num_particles[1] + m_num_particles[2] + m_num_particles[3] << endl;
    
     // Loop over all vehicle wheels
     int nthreads = GetSystem()->GetNumThreadsChrono();
-    //std::cout << nthreads << std::endl;
+    std::cout << "Num threads" << nthreads << std::endl;
     //nthreads = 4;
     std::vector<std::unordered_map<ChVector2<int>, HitRecord, CoordHash>> t_hits(nthreads);
     //#pragma omp parallel for num_threads(nthreads)
@@ -1614,7 +1638,7 @@ void SCMLoader_Custom::ComputeInternalForces() {
     //const auto& w_out = outputs.toTuple()->elements()[i].toTensor();
     const auto& w_out = outputs.toTensor();
 
-    //std::cout << "Outs: " << w_out.sizes() << std::endl;
+    std::cout << "Outs: " << w_out.sizes() << std::endl;
 
 
      // For each node around the wheel
@@ -1640,10 +1664,12 @@ void SCMLoader_Custom::ComputeInternalForces() {
         indexes.x() = static_cast<int>(std::round(pos_x/m_delta));
         indexes.y() = static_cast<int>(std::round(pos_y/m_delta));
 
-        float pos_z = GetHeight(indexes);
+        // lunes
+        // float pos_z = GetHeight(indexes); 
 
         //m_particle_positions[i][j] = ChVector<>(pos_x, pos_y, pos_z + def_z);
-        ChVector<> new_part_pos = ChVector<>(pos_x, pos_y, pos_z + def_z);
+        //ChVector<> new_part_pos = ChVector<>(pos_x, pos_y, pos_z + def_z);
+        ChVector<> new_part_pos = ChVector<>(pos_x, pos_y, def_z);  // lunes
 
     //    ChVector2<int> indexes; 
     //     //     //TODO Deniz do this part in a better way   
@@ -1718,7 +1744,9 @@ void SCMLoader_Custom::ComputeInternalForces() {
             t_hits[t_num].clear();
         }
 
+    std::cout << "Hits: " << newhits.size() << std::endl;
     m_timer_postprocess.stop();
+    nvtxRangePop();
 
     }
 
@@ -1952,6 +1980,7 @@ void SCMLoader_Custom::ComputeInternalForces() {
     // Compute contact forces
     // ----------------------
 
+    //nvtxRangePushA("Contact forces");
     m_timer_contact_forces.start();
 
     // Initialize local values for the soil parameters
@@ -2145,6 +2174,7 @@ void SCMLoader_Custom::ComputeInternalForces() {
     //cout << "Num hits per wheel: " << numhits[0] << "  " << numhits[1] << "  " << numhits[2] << "  " << numhits[3] << endl;
 
     m_timer_contact_forces.stop();
+    //nvtxRangePop();
 
     // --------------------------------------------------
     // Flow material to the side of rut, using heuristics

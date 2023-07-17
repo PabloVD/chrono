@@ -647,8 +647,10 @@ class CH_VEHICLE_API SCMLoader_Custom : public ChLoadContainer {
     ChVector<> m_box_size;
     ChVector<> m_box_offset;
     //std::shared_ptr<ChParticleCloud> m_particles;
-
+    
     torch::jit::script::Module m_module;
+
+    torch::Tensor pos_tensor, wpos_tensor, quat_tensor, linvel_tensor, angvel_tensor, glob_tensor;    
 
     bool m_verbose;
     double tire_radius;

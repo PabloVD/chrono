@@ -434,7 +434,10 @@ int main(int argc, char* argv[]) {
     std::shared_ptr<vehicle::SCMTerrain> terrain;
     bool terrain_created = false;
 
+    ChTimer timer_advance;
+
     while (true) {
+        timer_advance.reset();
         if (render && !vis->Run()) {
             break;
         }
@@ -490,13 +493,20 @@ int main(int argc, char* argv[]) {
             render_frame++;
         }
 
+        timer_advance.start();
         robot.DoStepDynamics(time_step);
+        timer_advance.stop();
 
         sim_frame++;
 
         if (render) {
             vis->EndScene();
         }
+
+        // Pablo
+        //std::cout << step_number << " " << step_timing << " " << total_timing << std::endl;
+        //terrain->PrintStepStatistics(std::cout);
+        std::cout << "Advance time by step (ms): " << 1e3 * timer_advance() << std::endl;
     }
 
     DBP_controller.WriteOutput(out_dir + "/DBP_" + mode_name + ".csv");
